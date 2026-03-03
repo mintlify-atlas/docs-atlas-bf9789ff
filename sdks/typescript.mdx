@@ -1,0 +1,412 @@
+---
+title: TypeScript SDK
+description: Type-safe TypeScript/JavaScript client with ESM and CommonJS support
+---
+
+## Installation
+
+Install the FlexPrice TypeScript SDK using npm:
+
+```bash
+npm install @flexprice/sdk
+```
+
+**Alternative package managers:**
+
+<CodeGroup>
+```bash pnpm
+pnpm add @flexprice/sdk
+```
+
+```bash bun
+bun add @flexprice/sdk
+```
+
+```bash yarn
+yarn add @flexprice/sdk
+```
+</CodeGroup>
+
+**Requirements:**
+- Node.js 18 or higher
+- Supports ESM and CommonJS
+
+## Quick Start
+
+Initialize the client and create a customer:
+
+```typescript
+import { FlexPrice } from "@flexprice/sdk";
+
+// Initialize client (server URL must include /v1)
+const flexPrice = new FlexPrice({
+  serverURL: "https://us.api.flexprice.io/v1",
+  apiKeyAuth: process.env.FLEXPRICE_API_KEY ?? "YOUR_API_KEY",
+});
+
+async function main() {
+  // Create a customer
+  const customer = await flexPrice.customers.createCustomer({
+    externalId: "customer-123",
+    email: "user@example.com",
+    name: "Example Customer",
+  });
+  console.log(customer);
+
+  // Ingest an event
+  const eventResult = await flexPrice.events.ingestEvent({
+    eventName: "api_request",
+    externalCustomerId: "customer-123",
+    properties: { endpoint: "/api/resource", method: "POST" },
+    source: "typescript_app",
+  });
+  console.log(eventResult);
+}
+
+main();
+```
+
+## Initialization
+
+Create a FlexPrice client with your API key:
+
+```typescript
+import { FlexPrice } from "@flexprice/sdk";
+
+const flexPrice = new FlexPrice({
+  serverURL: "https://us.api.flexprice.io/v1",
+  apiKeyAuth: process.env.FLEXPRICE_API_KEY!,
+});
+```
+
+<Note>
+  The server URL must include `/v1` and have no trailing slash: `https://us.api.flexprice.io/v1`
+</Note>
+
+## Importing Types and Enums
+
+All types, enums, and errors are re-exported from the package root:
+
+```typescript
+import {
+  FlexPrice,
+  FeatureType,
+  Status,
+  FlexpriceError,
+  CreateCustomerRequest,
+  createPageIterator,
+} from "@flexprice/sdk";
+
+// No need for deep imports like:
+// import { FeatureType } from "@flexprice/sdk/dist/sdk/models/shared";
+```
+
+## Creating a Customer
+
+```typescript
+const customer = await flexPrice.customers.createCustomer({
+  externalId: "customer-123",
+  email: "user@example.com",
+  name: "Example Customer",
+  metadata: {
+    plan: "enterprise",
+    region: "us-west",
+  },
+});
+
+console.log(`Created customer: ${customer.id}`);
+```
+
+## Ingesting Events
+
+### Single Event
+
+```typescript
+const result = await flexPrice.events.ingestEvent({
+  eventName: "file_upload",
+  externalCustomerId: "customer-123",
+  properties: {
+    file_size_bytes: 1048576,
+    file_type: "pdf",
+  },
+  source: "upload_service",
+});
+
+console.log(result);
+```
+
+### Batch Event Ingestion
+
+For high-volume event ingestion, batch multiple events:
+
+```typescript
+const events = [
+  {
+    eventName: "api_request",
+    externalCustomerId: "customer-123",
+    properties: { endpoint: "/api/data", method: "GET" },
+  },
+  {
+    eventName: "api_request",
+    externalCustomerId: "customer-456",
+    properties: { endpoint: "/api/users", method: "POST" },
+  },
+];
+
+// Send events concurrently
+const results = await Promise.all(
+  events.map(event => flexPrice.events.ingestEvent(event))
+);
+
+console.log(`Ingested ${results.length} events`);
+```
+
+## Error Handling
+
+```typescript
+import { FlexpriceError } from "@flexprice/sdk";
+
+try {
+  const customer = await flexPrice.customers.createCustomer({
+    externalId: "customer-123",
+    email: "user@example.com",
+  });
+} catch (error) {
+  if (error instanceof FlexpriceError) {
+    console.error(`API Error: ${error.message}`);
+    console.error(`Status: ${error.statusCode}`);
+  } else {
+    console.error(`Unexpected error: ${error}`);
+  }
+}
+```
+
+## Common Operations
+
+<CodeGroup>
+```typescript List Customers
+const customers = await flexPrice.customers.listCustomers({
+  pageSize: 50,
+  page: 1,
+});
+
+for (const customer of customers.customers) {
+  console.log(`Customer: ${customer.name} (${customer.externalId})`);
+}
+```
+
+```typescript Create Subscription
+const subscription = await flexPrice.subscriptions.createSubscription({
+  customerId: customer.id,
+  planId: plan.id,
+  startDate: new Date().toISOString(),
+});
+
+console.log(`Created subscription: ${subscription.id}`);
+```
+
+```typescript List Invoices
+const invoices = await flexPrice.invoices.listInvoices({
+  customerId: customer.id,
+  pageSize: 20,
+});
+
+for (const invoice of invoices.invoices) {
+  console.log(`Invoice: ${invoice.invoiceNumber} - ${invoice.total}`);
+}
+```
+
+```typescript Get Customer Usage
+const usage = await flexPrice.events.listRawEvents({
+  externalCustomerId: "customer-123",
+  pageSize: 100,
+});
+
+console.log(`Total events: ${usage.events.length}`);
+```
+</CodeGroup>
+
+## TypeScript Types
+
+The SDK provides full TypeScript support:
+
+```typescript
+import { FlexPrice, CreateCustomerRequest } from "@flexprice/sdk";
+
+const flexPrice = new FlexPrice({
+  serverURL: "https://us.api.flexprice.io/v1",
+  apiKeyAuth: process.env.FLEXPRICE_API_KEY!,
+});
+
+// Type-safe request
+const customerData: CreateCustomerRequest = {
+  externalId: "customer-123",
+  email: "user@example.com",
+  name: "Example Customer",
+};
+
+// Type-safe response
+const customer = await flexPrice.customers.createCustomer(customerData);
+// customer.id is typed as string
+// customer.email is typed as string | undefined
+```
+
+## Property Names (snake_case)
+
+<Warning>
+  The API expects **snake_case** field names in request bodies. Use the correct case:
+  
+  - ✅ Correct: `event_name`, `external_customer_id`, `page_size`
+  - ❌ Wrong: `eventName`, `externalCustomerId`, `pageSize`
+  
+  If you see validation errors, check the [API reference](https://docs.flexprice.io) for exact field names.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use environment variables">
+    Store API keys in environment variables:
+    ```typescript
+    const apiKey = process.env.FLEXPRICE_API_KEY;
+    if (!apiKey) throw new Error("FLEXPRICE_API_KEY not set");
+    ```
+  </Step>
+  
+  <Step title="Enable TypeScript strict mode">
+    Add to your `tsconfig.json`:
+    ```json
+    {
+      "compilerOptions": {
+        "strict": true
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Handle promises correctly">
+    Always use `async/await` or `.catch()` for error handling:
+    ```typescript
+    try {
+      await flexPrice.events.ingestEvent({...});
+    } catch (error) {
+      console.error(error);
+    }
+    ```
+  </Step>
+  
+  <Step title="Batch high-volume events">
+    Use `Promise.all()` for concurrent event ingestion to improve throughput
+  </Step>
+</Steps>
+
+## ESM and CommonJS
+
+The package supports both module systems:
+
+<CodeGroup>
+```typescript ESM
+import { FlexPrice } from "@flexprice/sdk";
+
+const flexPrice = new FlexPrice({...});
+```
+
+```javascript CommonJS
+const { FlexPrice } = require("@flexprice/sdk");
+
+const flexPrice = new FlexPrice({...});
+```
+</CodeGroup>
+
+## Framework Integration
+
+### Next.js
+
+```typescript
+// app/api/events/route.ts
+import { FlexPrice } from "@flexprice/sdk";
+import { NextResponse } from "next/server";
+
+const flexPrice = new FlexPrice({
+  serverURL: "https://us.api.flexprice.io/v1",
+  apiKeyAuth: process.env.FLEXPRICE_API_KEY!,
+});
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  
+  try {
+    const result = await flexPrice.events.ingestEvent({
+      eventName: body.eventName,
+      externalCustomerId: body.customerId,
+      properties: body.properties,
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    return NextResponse.json({ error }, { status: 500 });
+  }
+}
+```
+
+### Express
+
+```typescript
+import express from "express";
+import { FlexPrice } from "@flexprice/sdk";
+
+const app = express();
+const flexPrice = new FlexPrice({
+  serverURL: "https://us.api.flexprice.io/v1",
+  apiKeyAuth: process.env.FLEXPRICE_API_KEY!,
+});
+
+app.post("/api/events", async (req, res) => {
+  try {
+    const result = await flexPrice.events.ingestEvent({
+      eventName: req.body.eventName,
+      externalCustomerId: req.body.customerId,
+      properties: req.body.properties,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error });
+  }
+});
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Missing or invalid API key">
+    Ensure `FLEXPRICE_API_KEY` is set and the key is active. Use server-side only.
+  </Accordion>
+  
+  <Accordion title="Wrong server URL">
+    Use `https://us.api.flexprice.io/v1` (include `/v1`, no trailing slash).
+  </Accordion>
+  
+  <Accordion title="Validation or 4xx errors">
+    Confirm request body field names are in **snake_case** as documented in the API reference.
+  </Accordion>
+  
+  <Accordion title="Import errors">
+    All types are re-exported from the package root. Use:
+    ```typescript
+    import { FlexPrice, FeatureType } from "@flexprice/sdk";
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="https://docs.flexprice.io">
+    Complete FlexPrice API documentation
+  </Card>
+  <Card title="TypeScript SDK Examples" icon="code" href="https://github.com/flexprice/javascript-sdk/tree/main/examples">
+    Sample code and integration examples
+  </Card>
+  <Card title="NPM Package" icon="npm" href="https://www.npmjs.com/package/@flexprice/sdk">
+    View package on npm
+  </Card>
+</CardGroup>

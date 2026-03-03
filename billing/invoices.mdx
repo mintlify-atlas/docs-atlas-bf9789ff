@@ -1,0 +1,475 @@
+---
+title: 'Invoice Generation'
+description: 'Understand invoice structure, generation, and lifecycle management in FlexPrice'
+---
+
+## Overview
+
+Invoices are billing documents that detail charges for a customer over a specific period. FlexPrice generates invoices automatically for subscriptions, or manually for one-time charges. Invoices progress through states from draft to finalized to paid.
+
+## Invoice Structure
+
+A complete invoice contains comprehensive billing information:
+
+```json
+{
+  "id": "inv_abc123",
+  "invoice_number": "INV-2024-001",
+  "customer_id": "cus_xyz789",
+  "subscription_id": "sub_premium",
+  "invoice_type": "subscription",
+  "invoice_status": "open",
+  "payment_status": "pending",
+  "currency": "usd",
+  "subtotal": "1000.00",
+  "total_tax": "80.00",
+  "total_discount": "100.00",
+  "total_prepaid_credits_applied": "50.00",
+  "total": "930.00",
+  "amount_due": "930.00",
+  "amount_paid": "0.00",
+  "amount_remaining": "930.00",
+  "adjustment_amount": "0.00",
+  "refunded_amount": "0.00",
+  "period_start": "2024-03-01T00:00:00Z",
+  "period_end": "2024-04-01T00:00:00Z",
+  "billing_period": "month",
+  "billing_sequence": 3,
+  "billing_reason": "subscription_cycle",
+  "due_date": "2024-04-15T00:00:00Z",
+  "finalized_at": "2024-03-01T00:00:00Z",
+  "invoice_pdf_url": "https://api.flexprice.io/invoices/inv_abc123/pdf",
+  "version": 1,
+  "metadata": {
+    "po_number": "PO-2024-Q1-001"
+  }
+}
+```
+
+## Invoice Types
+
+FlexPrice supports multiple invoice types:
+
+<Tabs>
+  <Tab title="Subscription">
+    Recurring invoices generated automatically based on subscription billing cycles.
+    
+    ```json
+    {
+      "invoice_type": "subscription",
+      "subscription_id": "sub_premium",
+      "billing_sequence": 3,
+      "billing_reason": "subscription_cycle"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="One-Time">
+    Manual invoices for one-time charges, setup fees, or custom billing.
+    
+    ```json
+    {
+      "invoice_type": "one_time",
+      "subscription_id": null,
+      "billing_reason": "manual"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Usage">
+    Invoices for usage-based charges outside of subscriptions.
+    
+    ```json
+    {
+      "invoice_type": "usage",
+      "billing_reason": "usage_threshold"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Invoice Status
+
+Invoices progress through several states:
+
+<Steps>
+  <Step title="Draft">
+    Invoice is being prepared but not yet finalized. Line items can still be added or modified.
+    
+    ```json
+    { "invoice_status": "draft" }
+    ```
+  </Step>
+  
+  <Step title="Open">
+    Invoice has been finalized and is awaiting payment. No further modifications allowed.
+    
+    ```json
+    {
+      "invoice_status": "open",
+      "finalized_at": "2024-03-01T00:00:00Z"
+    }
+    ```
+  </Step>
+  
+  <Step title="Paid">
+    Invoice has been fully paid.
+    
+    ```json
+    {
+      "invoice_status": "paid",
+      "payment_status": "paid",
+      "paid_at": "2024-03-05T14:30:00Z"
+    }
+    ```
+  </Step>
+  
+  <Step title="Void">
+    Invoice has been voided and is no longer valid.
+    
+    ```json
+    {
+      "invoice_status": "voided",
+      "voided_at": "2024-03-02T09:15:00Z"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Payment Status
+
+Separate from invoice status, payment status tracks the payment state:
+
+- `pending`: Payment has not been attempted or is in progress
+- `paid`: Invoice is fully paid
+- `partial`: Invoice is partially paid
+- `failed`: Payment attempt failed
+- `overpaid`: Payment exceeds amount due (creates customer credit)
+
+<Warning>
+When `payment_status` is `overpaid`, the `amount_remaining` must be zero, and excess funds are typically applied as customer credits for future invoices.
+</Warning>
+
+## Line Items
+
+Invoice line items detail individual charges:
+
+```json
+{
+  "line_items": [
+    {
+      "id": "ili_seat_charge",
+      "invoice_id": "inv_abc123",
+      "customer_id": "cus_xyz789",
+      "subscription_id": "sub_premium",
+      "entity_type": "price",
+      "entity_id": "price_seat_monthly",
+      "price_id": "price_seat_monthly",
+      "price_type": "per_unit",
+      "display_name": "Premium Seats",
+      "plan_display_name": "Premium Plan",
+      "quantity": "10",
+      "price_unit": "seat",
+      "price_unit_amount": "50.00",
+      "amount": "500.00",
+      "currency": "usd",
+      "period_start": "2024-03-01T00:00:00Z",
+      "period_end": "2024-04-01T00:00:00Z",
+      "prepaid_credits_applied": "0.00",
+      "line_item_discount": "50.00",
+      "invoice_level_discount": "0.00",
+      "metadata": {
+        "department": "engineering"
+      }
+    },
+    {
+      "id": "ili_usage",
+      "invoice_id": "inv_abc123",
+      "price_type": "usage",
+      "meter_id": "meter_api_calls",
+      "meter_display_name": "API Calls",
+      "display_name": "API Usage",
+      "quantity": "150000",
+      "price_unit": "call",
+      "price_unit_amount": "0.002",
+      "amount": "300.00",
+      "currency": "usd",
+      "commitment_info": {
+        "commitment_amount": "10000.00",
+        "consumed_amount": "8500.00",
+        "overage_amount": "0.00",
+        "is_overage": false
+      }
+    }
+  ]
+}
+```
+
+### Line Item Discounts
+
+Line items can have multiple types of discounts:
+
+<Tabs>
+  <Tab title="Line Item Discount">
+    Discount applied directly to this specific line item (e.g., from a price-specific coupon).
+    
+    ```json
+    {
+      "amount": "500.00",
+      "line_item_discount": "50.00"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Invoice-Level Discount">
+    Portion of an invoice-wide discount allocated to this line item.
+    
+    ```json
+    {
+      "amount": "500.00",
+      "invoice_level_discount": "25.00"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Prepaid Credits">
+    Credits from prepaid wallet applied to this line item.
+    
+    ```json
+    {
+      "amount": "500.00",
+      "prepaid_credits_applied": "100.00"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Billing Periods
+
+Subscription invoices cover specific billing periods:
+
+```json
+{
+  "period_start": "2024-03-01T00:00:00Z",
+  "period_end": "2024-04-01T00:00:00Z",
+  "billing_period": "month",
+  "billing_sequence": 3
+}
+```
+
+- **period_start / period_end**: Exact date range covered by this invoice
+- **billing_period**: The subscription's billing period type
+- **billing_sequence**: Sequential number (3rd invoice for this subscription)
+
+## Billing Reasons
+
+The `billing_reason` field explains why the invoice was generated:
+
+- `subscription_cycle`: Regular subscription billing cycle
+- `subscription_create`: Initial subscription invoice
+- `subscription_update`: Mid-cycle subscription change
+- `subscription_threshold`: Usage threshold reached
+- `manual`: Manually created invoice
+- `proration`: Proration charges from subscription changes
+
+## Invoice Amount Calculations
+
+Invoice amounts follow a specific calculation flow:
+
+<Steps>
+  <Step title="Subtotal">
+    Sum of all line item amounts before discounts, taxes, or credits.
+    
+    ```
+    subtotal = sum(line_items.amount)
+    ```
+  </Step>
+  
+  <Step title="Apply Discounts">
+    Subtract coupon discounts (line-level and invoice-level).
+    
+    ```
+    after_discount = subtotal - total_discount
+    ```
+  </Step>
+  
+  <Step title="Apply Taxes">
+    Add calculated taxes based on customer location and tax rules.
+    
+    ```
+    after_tax = after_discount + total_tax
+    ```
+  </Step>
+  
+  <Step title="Apply Prepaid Credits">
+    Subtract prepaid credits from customer wallet.
+    
+    ```
+    amount_due = after_tax - total_prepaid_credits_applied
+    ```
+  </Step>
+  
+  <Step title="Final Total">
+    The total represents the complete invoice amount.
+    
+    ```
+    total = subtotal + total_tax - total_discount
+    amount_due = total - total_prepaid_credits_applied
+    ```
+  </Step>
+</Steps>
+
+## Invoice Numbers
+
+Each invoice gets a unique, human-readable number:
+
+```json
+{
+  "invoice_number": "INV-2024-001",
+  "billing_sequence": 1
+}
+```
+
+- **invoice_number**: Unique identifier per tenant, formatted for customer display
+- **billing_sequence**: Sequential counter for subscription invoices
+
+Invoice numbers are guaranteed unique per tenant and environment using database constraints.
+
+## Idempotency
+
+Invoice creation supports idempotency to prevent duplicates:
+
+```json
+{
+  "idempotency_key": "sub_abc123_period_2024-03"
+}
+```
+
+Using the same idempotency key for multiple invoice creation requests returns the existing invoice instead of creating duplicates.
+
+## Commitment Tracking
+
+For subscriptions with commitments, line items include commitment information:
+
+```json
+{
+  "commitment_info": {
+    "commitment_amount": "10000.00",
+    "consumed_amount": "8500.00",
+    "remaining_amount": "1500.00",
+    "overage_amount": "0.00",
+    "is_overage": false,
+    "overage_factor": "1.5"
+  }
+}
+```
+
+This tracks:
+- Progress toward commitment
+- Overage charges when commitment is exceeded
+- Applied overage pricing factors
+
+## Adjustments and Refunds
+
+Invoices track adjustments and refunds through credit notes:
+
+```json
+{
+  "amount_due": "1000.00",
+  "amount_paid": "1000.00",
+  "adjustment_amount": "50.00",
+  "refunded_amount": "100.00",
+  "amount_remaining": "0.00"
+}
+```
+
+- **adjustment_amount**: Non-cash reductions (goodwill credits, billing corrections)
+- **refunded_amount**: Actual cash refunds issued to customer
+
+<Warning>
+Adjustments and refunds are applied through credit notes, not by directly modifying invoices. This maintains audit trails and accounting integrity.
+</Warning>
+
+## Due Dates
+
+Invoices have configurable due dates based on payment terms:
+
+```json
+{
+  "finalized_at": "2024-03-01T00:00:00Z",
+  "due_date": "2024-03-31T00:00:00Z",
+  "payment_terms": "30_NET"
+}
+```
+
+Due date is calculated from the invoice finalization date plus the payment terms period.
+
+## PDF Generation
+
+Finalized invoices can be exported as PDFs:
+
+```json
+{
+  "invoice_pdf_url": "https://api.flexprice.io/invoices/inv_abc123/pdf"
+}
+```
+
+PDF URLs are typically signed and time-limited for security.
+
+## Invoice Validation
+
+Invoices undergo validation before finalization:
+
+<Steps>
+  <Step title="Amount Consistency">
+    - `amount_due` must be non-negative
+    - `amount_paid` must be non-negative
+    - `amount_paid + amount_remaining = amount_due` (unless overpaid)
+  </Step>
+  
+  <Step title="Period Validation">
+    - `period_end` must be after `period_start`
+    - Subscription invoices must have `billing_period` set
+  </Step>
+  
+  <Step title="Line Item Currency">
+    All line items must use the same currency as the invoice.
+  </Step>
+  
+  <Step title="Overpayment Rules">
+    When `payment_status` is `overpaid`, `amount_remaining` must be zero.
+  </Step>
+</Steps>
+
+## Metadata
+
+Invoices support custom metadata for integration and tracking:
+
+```json
+{
+  "metadata": {
+    "po_number": "PO-2024-Q1-001",
+    "department": "engineering",
+    "cost_center": "CC-ENG-001",
+    "contract_id": "CONTRACT-2024-001"
+  }
+}
+```
+
+Metadata is indexed and searchable, making it useful for:
+- Purchase order tracking
+- Department allocation
+- Contract references
+- Custom reporting dimensions
+
+## Version Control
+
+Invoices use versioning for safe concurrent operations:
+
+```json
+{
+  "version": 2
+}
+```
+
+The version increments with each modification, preventing race conditions in distributed systems.

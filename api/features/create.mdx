@@ -1,0 +1,358 @@
+---
+title: "Create Feature"
+api: "POST /v1/features"
+description: "Use when defining a new feature or capability to gate or meter (e.g. feature flags or usage-based limits). Ideal for boolean or usage features."
+---
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the feature (e.g., "API Access", "Advanced Analytics")
+</ParamField>
+
+<ParamField body="lookup_key" type="string">
+  Unique identifier for API lookups (e.g., "api_access", "advanced_analytics")
+  
+  Must be unique within the environment. Used for programmatic access.
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  Type of feature
+  
+  **Values:**
+  - `BOOLEAN`: Simple on/off feature flag
+  - `METERED`: Usage-based feature with consumption tracking
+  - `STATIC`: Feature with a fixed configuration value
+</ParamField>
+
+<ParamField body="description" type="string">
+  Detailed description of what this feature provides
+</ParamField>
+
+<ParamField body="meter_id" type="string">
+  ID of an existing meter to use for METERED features
+  
+  Either `meter_id` or `meter` must be provided for METERED features.
+</ParamField>
+
+<ParamField body="meter" type="object">
+  Meter configuration for METERED features (alternative to meter_id)
+  
+  <Expandable title="Meter object">
+    <ParamField body="name" type="string" required>
+      Name of the meter
+    </ParamField>
+    
+    <ParamField body="event_type" type="string" required>
+      Event type to track (e.g., "api_call", "storage_gb")
+    </ParamField>
+    
+    <ParamField body="aggregation" type="string" required>
+      How to aggregate usage
+      
+      **Values:** `SUM`, `COUNT`, `MAX`, `UNIQUE_COUNT`
+    </ParamField>
+    
+    <ParamField body="field" type="string">
+      Field to aggregate (required for SUM and MAX)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="unit_singular" type="string">
+  Singular unit name (e.g., "API call", "GB")
+  
+  Both `unit_singular` and `unit_plural` must be provided together.
+</ParamField>
+
+<ParamField body="unit_plural" type="string">
+  Plural unit name (e.g., "API calls", "GBs")
+  
+  Both `unit_singular` and `unit_plural` must be provided together.
+</ParamField>
+
+<ParamField body="alert_settings" type="object">
+  Alert configuration for usage thresholds
+  
+  <Expandable title="Alert settings object">
+    <ParamField body="alert_enabled" type="boolean" default="false">
+      Enable usage alerts
+    </ParamField>
+    
+    <ParamField body="threshold_type" type="string">
+      Type of threshold
+      
+      **Values:** `PERCENTAGE`, `ABSOLUTE`
+    </ParamField>
+    
+    <ParamField body="threshold_value" type="string">
+      Threshold value that triggers alerts
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom metadata as key-value pairs
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the feature
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the feature
+</ResponseField>
+
+<ResponseField name="lookup_key" type="string">
+  Lookup key for programmatic access
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Feature type (BOOLEAN, METERED, or STATIC)
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Feature description
+</ResponseField>
+
+<ResponseField name="meter_id" type="string">
+  ID of the associated meter (for METERED features)
+</ResponseField>
+
+<ResponseField name="meter" type="object">
+  Full meter object (if expanded)
+</ResponseField>
+
+<ResponseField name="unit_singular" type="string">
+  Singular unit name
+</ResponseField>
+
+<ResponseField name="unit_plural" type="string">
+  Plural unit name
+</ResponseField>
+
+<ResponseField name="alert_settings" type="object">
+  Alert configuration
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Timestamp when feature was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  Timestamp when feature was last updated
+</ResponseField>
+
+<RequestExample>
+```bash cURL - Boolean feature
+curl -X POST "https://api.flexprice.io/v1/features" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Advanced Analytics",
+    "lookup_key": "advanced_analytics",
+    "type": "BOOLEAN",
+    "description": "Access to advanced analytics dashboard"
+  }'
+```
+
+```bash cURL - Metered feature
+curl -X POST "https://api.flexprice.io/v1/features" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "API Calls",
+    "lookup_key": "api_calls",
+    "type": "METERED",
+    "description": "REST API access with usage tracking",
+    "meter": {
+      "name": "API Call Counter",
+      "event_type": "api_call",
+      "aggregation": "COUNT"
+    },
+    "unit_singular": "API call",
+    "unit_plural": "API calls"
+  }'
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+# Boolean feature
+feature = client.features.create(
+    name="Advanced Analytics",
+    lookup_key="advanced_analytics",
+    type="BOOLEAN",
+    description="Access to advanced analytics dashboard"
+)
+
+# Metered feature
+feature = client.features.create(
+    name="API Calls",
+    lookup_key="api_calls",
+    type="METERED",
+    description="REST API access with usage tracking",
+    meter={
+        "name": "API Call Counter",
+        "event_type": "api_call",
+        "aggregation": "COUNT"
+    },
+    unit_singular="API call",
+    unit_plural="API calls"
+)
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+// Boolean feature
+const feature = await client.features.create({
+  name: "Advanced Analytics",
+  lookupKey: "advanced_analytics",
+  type: "BOOLEAN",
+  description: "Access to advanced analytics dashboard"
+});
+
+// Metered feature
+const feature = await client.features.create({
+  name: "API Calls",
+  lookupKey: "api_calls",
+  type: "METERED",
+  description: "REST API access with usage tracking",
+  meter: {
+    name: "API Call Counter",
+    eventType: "api_call",
+    aggregation: "COUNT"
+  },
+  unitSingular: "API call",
+  unitPlural: "API calls"
+});
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+// Boolean feature
+feature, err := client.Features.Create(context.Background(), &flexprice.FeatureCreateParams{
+    Name: "Advanced Analytics",
+    LookupKey: "advanced_analytics",
+    Type: "BOOLEAN",
+    Description: "Access to advanced analytics dashboard",
+})
+
+// Metered feature
+feature, err := client.Features.Create(context.Background(), &flexprice.FeatureCreateParams{
+    Name: "API Calls",
+    LookupKey: "api_calls",
+    Type: "METERED",
+    Description: "REST API access with usage tracking",
+    Meter: &flexprice.MeterParams{
+        Name: "API Call Counter",
+        EventType: "api_call",
+        Aggregation: "COUNT",
+    },
+    UnitSingular: "API call",
+    UnitPlural: "API calls",
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "id": "feat_abc123",
+  "name": "API Calls",
+  "lookup_key": "api_calls",
+  "type": "METERED",
+  "description": "REST API access with usage tracking",
+  "meter_id": "meter_xyz789",
+  "unit_singular": "API call",
+  "unit_plural": "API calls",
+  "metadata": {},
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z"
+}
+```
+</ResponseExample>
+
+## Feature Types Explained
+
+<CardGroup cols={3}>
+  <Card title="BOOLEAN" icon="toggle-on">
+    Simple on/off feature flags. Used for access control without usage tracking.
+    
+    **Examples:**
+    - Premium support
+    - Advanced analytics
+    - Custom branding
+  </Card>
+  
+  <Card title="METERED" icon="gauge">
+    Usage-based features that track consumption. Requires a meter for tracking.
+    
+    **Examples:**
+    - API calls
+    - Storage (GB)
+    - Monthly active users
+  </Card>
+  
+  <Card title="STATIC" icon="file-lines">
+    Features with fixed configuration values (e.g., "5 team members", "10GB storage").
+    
+    **Examples:**
+    - User seats
+    - Storage limits
+    - Project count
+  </Card>
+</CardGroup>
+
+## Creating Features with Meters
+
+For METERED features, you have two options:
+
+<AccordionGroup>
+  <Accordion title="Option 1: Use Existing Meter">
+    Reference a meter you've already created:
+    
+    ```json
+    {
+      "name": "API Calls",
+      "type": "METERED",
+      "meter_id": "meter_xyz789"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Option 2: Create Meter Inline">
+    Define the meter configuration in the same request:
+    
+    ```json
+    {
+      "name": "API Calls",
+      "type": "METERED",
+      "meter": {
+        "name": "API Call Counter",
+        "event_type": "api_call",
+        "aggregation": "COUNT"
+      }
+    }
+    ```
+    
+    FlexPrice will create the meter automatically.
+  </Accordion>
+</AccordionGroup>
+
+## After Creating a Feature
+
+Once you've created a feature, you can:
+
+1. **Add to plans**: Include the feature in your plan entitlements
+2. **Check access**: Use the [Check Access](/api/features/check-access) endpoint to gate features
+3. **Track usage**: Send events to meter usage for METERED features
+4. **Set limits**: Configure usage limits via entitlements

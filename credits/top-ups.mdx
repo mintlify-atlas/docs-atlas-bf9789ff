@@ -1,0 +1,522 @@
+---
+title: Auto Top-Up
+description: Automatically replenish wallet credits when balance falls below a threshold
+---
+
+## Overview
+
+Auto top-up automatically adds credits to a customer's wallet when the balance falls below a specified threshold. This ensures uninterrupted service and provides a seamless credit management experience.
+
+## How Auto Top-Up Works
+
+<Steps>
+
+<Step title="Balance monitoring">
+FlexPrice monitors wallet balances after each transaction (credit or debit).
+</Step>
+
+<Step title="Threshold check">
+When balance falls below the configured `threshold`, auto top-up is triggered.
+</Step>
+
+<Step title="Credit addition">
+The configured `amount` of credits is added to the wallet.
+</Step>
+
+<Step title="Invoice generation (optional)">
+If `invoicing` is enabled, an invoice is created for the credit purchase.
+</Step>
+
+</Steps>
+
+## Configuration
+
+Auto top-up is configured at the wallet level using the `auto_topup` object:
+
+```json
+{
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "50.00",
+    "amount": "200.00",
+    "invoicing": true
+  }
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enabled` | boolean | Yes | Whether auto top-up is active |
+| `threshold` | decimal | Yes | Balance level that triggers top-up (in credits) |
+| `amount` | decimal | Yes | Credits to add when triggered (in credits) |
+| `invoicing` | boolean | Yes | Whether to create an invoice for the top-up |
+
+<Note>
+All amounts are in **credit units**, not currency units. Use the wallet's `conversion_rate` to convert between credits and currency.
+</Note>
+
+## Setting Up Auto Top-Up
+
+### On Wallet Creation
+
+Include auto top-up settings when creating a new wallet:
+
+```json
+POST /v1/wallets
+{
+  "customer_id": "cust_1234567890",
+  "currency": "usd",
+  "wallet_type": "PRE_PAID",
+  "conversion_rate": "1.0",
+  "initial_credits_to_load": "500.00",
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "100.00",
+    "amount": "250.00",
+    "invoicing": true
+  }
+}
+```
+
+### On Existing Wallet
+
+Update an existing wallet to enable auto top-up:
+
+```json
+PATCH /v1/wallets/{wallet_id}
+{
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "50.00",
+    "amount": "200.00",
+    "invoicing": false
+  }
+}
+```
+
+### Disable Auto Top-Up
+
+Set `enabled` to `false` to disable without removing configuration:
+
+```json
+PATCH /v1/wallets/{wallet_id}
+{
+  "auto_topup": {
+    "enabled": false
+  }
+}
+```
+
+## Top-Up Behavior
+
+### Trigger Conditions
+
+Auto top-up is evaluated:
+
+1. **After credit transactions** - When credits are added to the wallet
+2. **After debit transactions** - When credits are consumed
+3. **After wallet balance calculations** - Real-time balance updates
+
+<Warning>
+Auto top-up evaluates the **credit_balance**, not the currency balance. Ensure your threshold and amount are set appropriately.
+</Warning>
+
+### Threshold Evaluation
+
+Top-up triggers when: `credit_balance < threshold`
+
+**Example:**
+```json
+{
+  "threshold": "50.00",
+  "amount": "200.00"
+}
+```
+
+| Current Balance | Action |
+|-----------------|--------|
+| 75.00 | No action (above threshold) |
+| 50.00 | No action (equal to threshold) |
+| 49.99 | Top up 200.00 credits |
+| 10.00 | Top up 200.00 credits |
+
+<Note>
+The top-up amount is fixed - it doesn't calculate to reach a target balance. If balance is 10 and amount is 200, the new balance will be 210.
+</Note>
+
+### Transaction Reason
+
+Auto top-up transactions are recorded with:
+
+**With invoicing:**
+```json
+{
+  "transaction_reason": "PURCHASED_CREDIT_INVOICED"
+}
+```
+
+**Without invoicing:**
+```json
+{
+  "transaction_reason": "PURCHASED_CREDIT_DIRECT"
+}
+```
+
+## Invoicing Behavior
+
+### When `invoicing: true`
+
+<Steps>
+
+<Step title="Credits added to wallet">
+The configured amount is immediately added to wallet as pending credits.
+</Step>
+
+<Step title="Invoice created">
+An invoice is generated for the credit purchase:
+
+```json
+{
+  "customer_id": "cust_1234567890",
+  "line_items": [
+    {
+      "description": "Credit purchase (auto top-up)",
+      "quantity": 200.00,
+      "unit_price": 1.00,
+      "amount": 200.00
+    }
+  ],
+  "total": 200.00,
+  "status": "open"
+}
+```
+</Step>
+
+<Step title="Payment required">
+Customer must pay the invoice to finalize credits. Until paid:
+- Credits show as `PENDING` in transaction
+- Credits cannot be used for consumption
+- Invoice appears in customer's unpaid balance
+</Step>
+
+<Step title="Credits activated on payment">
+Once invoice is paid:
+- Transaction status changes to `COMPLETED`
+- Credits become available for use
+- Wallet balance is updated
+</Step>
+
+</Steps>
+
+### When `invoicing: false`
+
+<Steps>
+
+<Step title="Credits immediately added">
+Credits are added directly to the wallet with `COMPLETED` status.
+</Step>
+
+<Step title="No invoice created">
+No invoice is generated - this is a free top-up.
+</Step>
+
+<Step title="Credits immediately available">
+Customer can use credits right away.
+</Step>
+
+</Steps>
+
+<Note>
+Use `invoicing: false` for promotional credits or when billing is handled externally. Use `invoicing: true` when customers should be charged for the top-up.
+</Note>
+
+## Use Cases
+
+### Prepaid Service Plans
+
+```json
+{
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "100.00",
+    "amount": "500.00",
+    "invoicing": true
+  }
+}
+```
+
+Customer gets charged automatically when balance is low, ensuring uninterrupted service.
+
+### Promotional Credit Maintenance
+
+```json
+{
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "10.00",
+    "amount": "50.00",
+    "invoicing": false
+  }
+}
+```
+
+Automatically provide promotional credits to keep free-tier users engaged.
+
+### Enterprise Credit Buffer
+
+```json
+{
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "1000.00",
+    "amount": "5000.00",
+    "invoicing": true
+  }
+}
+```
+
+Maintain a healthy credit buffer for high-volume enterprise customers.
+
+### Development/Testing Credits
+
+```json
+{
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "5.00",
+    "amount": "25.00",
+    "invoicing": false
+  }
+}
+```
+
+Keep development accounts topped up without billing.
+
+## Monitoring Auto Top-Up
+
+### Check Auto Top-Up Status
+
+Retrieve wallet with auto top-up configuration:
+
+```bash
+GET /v1/wallets/{wallet_id}
+```
+
+Response includes:
+```json
+{
+  "id": "wallet_1234567890",
+  "credit_balance": "75.00",
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "50.00",
+    "amount": "200.00",
+    "invoicing": true
+  }
+}
+```
+
+### Track Top-Up Transactions
+
+Filter wallet transactions to see auto top-ups:
+
+```bash
+GET /v1/wallets/{wallet_id}/transactions
+  ?transaction_reason=PURCHASED_CREDIT_INVOICED
+  &type=CREDIT
+```
+
+### Monitor Top-Up Invoices
+
+Find invoices created by auto top-up:
+
+```bash
+GET /v1/invoices
+  ?customer_id=cust_1234567890
+  &metadata.source=auto_topup
+```
+
+## Best Practices
+
+### Threshold Sizing
+
+<Steps>
+
+<Step title="Calculate average consumption">
+Determine typical daily or weekly credit usage:
+
+- Low usage: 10-50 credits/day
+- Medium usage: 50-500 credits/day
+- High usage: 500+ credits/day
+</Step>
+
+<Step title="Set threshold for buffer">
+Configure threshold to provide 3-7 days of buffer:
+
+- Low: threshold = 100-200 credits
+- Medium: threshold = 500-1000 credits
+- High: threshold = 2000-5000 credits
+</Step>
+
+<Step title="Size top-up amount">
+Set amount to 2-4x the threshold:
+
+- If threshold = 100, amount = 200-400
+- If threshold = 1000, amount = 2000-4000
+</Step>
+
+</Steps>
+
+### Prevent Over-Billing
+
+- Set reasonable `amount` values to avoid large unexpected charges
+- Use `threshold` high enough to prevent frequent top-ups
+- Monitor customers with frequent auto top-ups (may indicate usage spikes)
+- Consider usage alerts in addition to auto top-up
+
+### Test Configuration
+
+1. Create a test wallet with auto top-up
+2. Manually debit credits to trigger threshold
+3. Verify credits are added
+4. If invoicing is enabled, check invoice creation
+5. Confirm transaction appears in wallet history
+6. Test disabling and re-enabling
+
+### Communication
+
+- Notify customers when auto top-up is enabled on their account
+- Send emails when auto top-up is triggered
+- Include top-up transactions in billing summaries
+- Allow customers to configure their own thresholds (via self-service portal)
+
+## Conversion Rate Considerations
+
+Auto top-up uses the wallet's `topup_conversion_rate` for invoicing:
+
+```json
+{
+  "conversion_rate": "1.0",
+  "topup_conversion_rate": "1.0",
+  "auto_topup": {
+    "threshold": "50.00",
+    "amount": "200.00",
+    "invoicing": true
+  }
+}
+```
+
+**Invoice calculation:**
+```
+credits = 200.00
+topup_conversion_rate = 1.0
+invoice_amount = credits × topup_conversion_rate = 200.00 USD
+```
+
+<Note>
+If `topup_conversion_rate` differs from `conversion_rate`, customers may pay a different rate for auto top-up credits versus credit consumption.
+</Note>
+
+## Limitations
+
+### Cannot Customize Per Top-Up
+
+- Amount is fixed in configuration
+- Cannot vary based on balance or usage patterns
+- No dynamic pricing or volume discounts
+
+**Workaround:** Use webhooks to detect low balance and trigger custom top-up logic via API.
+
+### Single Threshold
+
+- Only one threshold can be configured
+- Cannot set multiple tiers (e.g., 50 credits at threshold 100, 200 credits at threshold 20)
+
+**Workaround:** Implement custom logic using balance alerts and API-driven top-ups.
+
+### No Scheduling
+
+- Triggers based on balance only
+- Cannot schedule regular top-ups (e.g., "every Monday")
+
+**Workaround:** Use recurring credit grants at the plan level for scheduled credit allocation.
+
+## Security Considerations
+
+### Invoicing Enabled
+
+- Customer must have valid payment method on file
+- Failed payments will leave credits in `PENDING` state
+- Consider payment retry policies
+- Set invoice due dates appropriately
+
+### Invoicing Disabled
+
+- No payment validation occurs
+- Credits are granted immediately
+- Monitor for abuse if exposed to self-service
+- Consider rate limiting or maximum top-up amounts
+
+### Wallet Permissions
+
+- Restrict who can enable/disable auto top-up
+- Log configuration changes for audit
+- Validate threshold and amount ranges (prevent $10,000 auto top-ups by accident)
+
+## Troubleshooting
+
+### Top-Up Not Triggering
+
+**Check balance calculation:**
+```bash
+GET /v1/wallets/{wallet_id}/balance?include_real_time_balance=true
+```
+
+Ensure `credit_balance` is actually below threshold.
+
+**Verify configuration:**
+```bash
+GET /v1/wallets/{wallet_id}
+```
+
+Confirm `auto_topup.enabled = true` and values are correct.
+
+**Check recent transactions:**
+May have recently triggered - check for transactions with reason `PURCHASED_CREDIT_INVOICED`.
+
+### Credits Added But Not Available
+
+If `invoicing: true`, credits remain `PENDING` until invoice is paid:
+
+```bash
+GET /v1/invoices?customer_id=cust_1234567890&status=open
+```
+
+Pay or void the invoice to complete or cancel the top-up.
+
+### Multiple Top-Ups in Short Period
+
+If balance drops below threshold multiple times quickly:
+
+- Increase `amount` to provide larger buffer
+- Increase `threshold` to trigger earlier
+- Investigate usage spike causing rapid consumption
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallets" icon="wallet" href="/credits/wallets">
+    Learn about wallet configuration
+  </Card>
+  <Card title="Credit Grants" icon="gift" href="/credits/grants">
+    Set up automatic credit allocation
+  </Card>
+  <Card title="Alerts" icon="bell" href="/monitoring/alerts">
+    Configure balance notifications
+  </Card>
+  <Card title="Invoices" icon="file-invoice" href="/invoices/overview">
+    Understand invoice creation
+  </Card>
+</CardGroup>

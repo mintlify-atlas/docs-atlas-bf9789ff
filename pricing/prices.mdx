@@ -1,0 +1,495 @@
+---
+title: 'Prices'
+description: 'Configure pricing models with flexible billing strategies'
+---
+
+## Overview
+
+Prices define the actual cost and billing mechanics for plans, add-ons, and other entities in FlexPrice. Each price specifies how much to charge, when to charge it, and how to calculate the amount based on quantity or usage.
+
+## Price Structure
+
+### Core Configuration
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the price (max 50 characters)
+</ParamField>
+
+<ParamField path="amount" type="decimal" required>
+  Price amount in major currency units (e.g., 12.50 for $12.50, not cents)
+</ParamField>
+
+<ParamField path="currency" type="string" required>
+  Three-letter ISO currency code in lowercase (e.g., `usd`, `eur`, `gbp`)
+</ParamField>
+
+<ParamField path="display_amount" type="string">
+  Formatted amount with currency symbol (e.g., "$12.50")
+</ParamField>
+
+<ParamField path="display_name" type="string">
+  Human-readable name for the price (max 255 characters)
+</ParamField>
+
+<ParamField path="type" type="enum" required>
+  Price type:
+  - `FIXED`: Static price (seats, licenses, base fees)
+  - `USAGE`: Consumption-based price (requires `meter_id`)
+</ParamField>
+
+<ParamField path="entity_type" type="enum" required>
+  Entity this price belongs to:
+  - `PLAN`: Price for a plan
+  - `ADDON`: Price for an add-on
+  - `SUBSCRIPTION`: Subscription-level override
+  - `PRICE`: Price override
+</ParamField>
+
+<ParamField path="entity_id" type="string" required>
+  ID of the plan, addon, subscription, or price this price is associated with
+</ParamField>
+
+### Billing Configuration
+
+<ParamField path="billing_model" type="enum" required>
+  How to calculate the total:
+  - `FLAT_FEE`: Simple per-unit pricing (amount × quantity)
+  - `PACKAGE`: Fixed price for a bundle of units
+  - `TIERED`: Different prices at different volume levels
+</ParamField>
+
+<ParamField path="billing_cadence" type="enum" required>
+  Frequency of charges:
+  - `RECURRING`: Charges repeat each billing period
+  - `ONETIME`: Single charge
+</ParamField>
+
+<ParamField path="billing_period" type="enum" required>
+  Duration of each billing cycle:
+  - `DAILY`, `WEEKLY`, `MONTHLY`, `QUARTERLY`, `HALF_YEARLY`, `ANNUAL`
+</ParamField>
+
+<ParamField path="billing_period_count" type="integer" default="1">
+  Number of billing periods (e.g., `2` with `MONTHLY` = every 2 months)
+</ParamField>
+
+<ParamField path="invoice_cadence" type="enum">
+  When to generate invoices:
+  - `ADVANCE`: Invoice at the start of the period
+  - `ARREAR`: Invoice at the end of the period (default for usage-based)
+</ParamField>
+
+### Additional Fields
+
+<ParamField path="lookup_key" type="string">
+  Human-readable identifier for API lookups (max 255 characters)
+</ParamField>
+
+<ParamField path="description" type="text">
+  Detailed description of what this price covers
+</ParamField>
+
+<ParamField path="trial_period" type="integer" default="0">
+  Trial period in days (only for `FIXED` prices with `RECURRING` cadence)
+</ParamField>
+
+<ParamField path="min_quantity" type="decimal">
+  Minimum quantity that can be purchased
+</ParamField>
+
+<ParamField path="start_date" type="datetime">
+  When this price becomes active
+</ParamField>
+
+<ParamField path="end_date" type="datetime">
+  When this price expires (null = no expiration)
+</ParamField>
+
+<ParamField path="metadata" type="object">
+  Custom key-value pairs
+</ParamField>
+
+## Billing Models
+
+<Tabs>
+  <Tab title="Flat Fee">
+    Simple per-unit pricing. Total = amount × quantity.
+
+    ```json Flat Fee Price
+    {
+      "amount": "50.00",
+      "currency": "usd",
+      "type": "FIXED",
+      "billing_model": "FLAT_FEE",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "display_name": "Per Seat"
+    }
+    ```
+
+    **Example Calculation:**
+    - 5 users × $50/user = $250/month
+    - 10 users × $50/user = $500/month
+
+    **Use Cases:**
+    - Per-seat pricing
+    - Per-license fees
+    - Simple subscription fees
+  </Tab>
+
+  <Tab title="Package">
+    Fixed price for a bundle of units. Use `transform_quantity` to define packages.
+
+    ```json Package Price
+    {
+      "amount": "100.00",
+      "currency": "usd",
+      "type": "USAGE",
+      "billing_model": "PACKAGE",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "meter_id": "meter_emails",
+      "transform_quantity": {
+        "divide_by": 1000,
+        "round": "up"
+      },
+      "display_name": "Email Packages"
+    }
+    ```
+
+    **Example Calculation:**
+    - 500 emails → rounds up to 1 package × $100 = $100
+    - 1,500 emails → rounds up to 2 packages × $100 = $200
+    - 2,100 emails → rounds up to 3 packages × $100 = $300
+
+    **Transform Quantity:**
+    - `divide_by`: Package size (units per package)
+    - `round`: `up` (ceiling) or `down` (floor)
+
+    **Use Cases:**
+    - Block pricing (1000 emails for $100)
+    - Bundled units
+    - Prepaid packages
+  </Tab>
+
+  <Tab title="Tiered">
+    Different unit prices at different volume levels. Supports two tier modes.
+
+    ### Volume Pricing
+    All units priced at the tier reached.
+
+    ```json Volume Tiered Price
+    {
+      "currency": "usd",
+      "type": "USAGE",
+      "billing_model": "TIERED",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "meter_id": "meter_storage",
+      "tier_mode": "VOLUME",
+      "tiers": [
+        {
+          "up_to": 100,
+          "unit_amount": "1.00"
+        },
+        {
+          "up_to": 1000,
+          "unit_amount": "0.50"
+        },
+        {
+          "up_to": null,
+          "unit_amount": "0.25"
+        }
+      ]
+    }
+    ```
+
+    **Example Calculation (Volume):**
+    - 50 GB → Tier 1 (≤100): 50 × $1.00 = $50
+    - 500 GB → Tier 2 (≤1000): 500 × $0.50 = $250
+    - 1,500 GB → Tier 3 (>1000): 1,500 × $0.25 = $375
+
+    ### Slab Pricing
+    Each tier priced separately (graduated).
+
+    ```json Slab Tiered Price
+    {
+      "currency": "usd",
+      "type": "USAGE",
+      "billing_model": "TIERED",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "meter_id": "meter_api_calls",
+      "tier_mode": "SLAB",
+      "tiers": [
+        {
+          "up_to": 1000,
+          "unit_amount": "0.00"
+        },
+        {
+          "up_to": 10000,
+          "unit_amount": "0.10"
+        },
+        {
+          "up_to": null,
+          "unit_amount": "0.05"
+        }
+      ]
+    }
+    ```
+
+    **Example Calculation (Slab):**
+    - 5,000 calls:
+      - Tier 1: 1,000 × $0.00 = $0
+      - Tier 2: 4,000 × $0.10 = $400
+      - Total: $400
+    - 15,000 calls:
+      - Tier 1: 1,000 × $0.00 = $0
+      - Tier 2: 9,000 × $0.10 = $900
+      - Tier 3: 5,000 × $0.05 = $250
+      - Total: $1,150
+
+    **Tier Structure:**
+    - `up_to`: Inclusive upper boundary (null = infinity)
+    - `unit_amount`: Price per unit in this tier
+    - `flat_amount`: Optional fixed fee for the tier
+  </Tab>
+</Tabs>
+
+## Price Types
+
+<AccordionGroup>
+  <Accordion title="Fixed Prices">
+    Static prices independent of usage tracking.
+
+    ```json
+    {
+      "type": "FIXED",
+      "amount": "29.00",
+      "currency": "usd",
+      "billing_model": "FLAT_FEE",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "trial_period": 14
+    }
+    ```
+
+    **Characteristics:**
+    - No meter required
+    - Quantity set manually (e.g., number of seats)
+    - Supports trial periods
+    - Predictable billing amounts
+
+    **Common Uses:**
+    - Subscription base fees
+    - Per-seat licenses
+    - Flat-rate services
+  </Accordion>
+
+  <Accordion title="Usage Prices">
+    Consumption-based prices tied to meters.
+
+    ```json
+    {
+      "type": "USAGE",
+      "currency": "usd",
+      "billing_model": "FLAT_FEE",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "meter_id": "meter_compute_hours",
+      "amount": "0.50"
+    }
+    ```
+
+    **Characteristics:**
+    - Requires `meter_id`
+    - Quantity calculated from tracked events
+    - No trial periods (usage-based by nature)
+    - Typically invoiced in arrears
+
+    **Common Uses:**
+    - API calls
+    - Compute hours
+    - Storage consumption
+    - Data transfer
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Custom Price Units
+
+Charge in non-fiat currencies or custom units (credits, tokens, etc.).
+
+```json Custom Price Unit
+{
+  "amount": "10000.00",
+  "currency": "usd",
+  "price_unit_type": "CUSTOM",
+  "price_unit_id": "unit_btc",
+  "price_unit": "btc",
+  "price_unit_amount": "0.0025",
+  "conversion_rate": "40000.00",
+  "display_price_unit_amount": "₿0.0025"
+}
+```
+
+**Fields:**
+- `price_unit_type`: `FIAT` or `CUSTOM`
+- `price_unit_id`: ID of custom unit entity
+- `price_unit_amount`: Amount in custom units
+- `conversion_rate`: Exchange rate to fiat (1 BTC = 40,000 USD)
+
+### Tiered Pricing with Flat Fees
+
+Combine per-unit pricing with tier-specific fixed fees.
+
+```json Tier with Flat Amount
+{
+  "tiers": [
+    {
+      "up_to": 100,
+      "unit_amount": "1.00",
+      "flat_amount": "50.00"
+    }
+  ]
+}
+```
+
+**Calculation:** (quantity × unit_amount) + flat_amount
+- 50 units: (50 × $1.00) + $50.00 = $100.00
+
+### Price Lifecycle Management
+
+```json Time-Bound Price
+{
+  "start_date": "2024-03-01T00:00:00Z",
+  "end_date": "2024-06-01T00:00:00Z",
+  "description": "Q1 Promotional Pricing"
+}
+```
+
+<Note>
+**Active Price Logic**: A price is active when:
+- Status is `published`
+- Current time ≥ `start_date` (if set)
+- Current time < `end_date` (if set)
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Decimal Precision" icon="calculator">
+    Store amounts with appropriate precision. FlexPrice uses `decimal(25,15)` internally. Avoid floating-point errors.
+  </Card>
+  
+  <Card title="Set Display Names" icon="tag">
+    Use clear `display_name` values: "Base Subscription", "Overage Charges", "Per-User Fee"
+  </Card>
+  
+  <Card title="Plan for Currency" icon="globe">
+    Create separate prices for different currencies rather than relying on conversion:
+    ```json
+    {"currency": "usd", "amount": "50.00"}
+    {"currency": "eur", "amount": "45.00"}
+    ```
+  </Card>
+  
+  <Card title="Group Related Prices" icon="layer-group">
+    Use `group_id` to associate prices that should be managed together (e.g., monthly and annual versions)
+  </Card>
+</CardGroup>
+
+<Warning>
+**Trial Period Restrictions**: Trial periods only apply to `FIXED` prices with `RECURRING` cadence. Setting a trial on usage-based prices will be ignored.
+</Warning>
+
+<Note>
+**Invoice Timing**: 
+- `ADVANCE`: Customers pay at the start (common for subscriptions)
+- `ARREAR`: Customers pay at the end (typical for usage-based pricing)
+</Note>
+
+## Example Configurations
+
+<CodeGroup>
+```json Monthly Subscription
+{
+  "amount": "99.00",
+  "currency": "usd",
+  "type": "FIXED",
+  "billing_model": "FLAT_FEE",
+  "billing_cadence": "RECURRING",
+  "billing_period": "MONTHLY",
+  "billing_period_count": 1,
+  "invoice_cadence": "ADVANCE",
+  "trial_period": 14,
+  "entity_type": "PLAN",
+  "entity_id": "plan_professional",
+  "display_name": "Monthly Subscription"
+}
+```
+
+```json Annual with Discount
+{
+  "amount": "990.00",
+  "currency": "usd",
+  "type": "FIXED",
+  "billing_model": "FLAT_FEE",
+  "billing_cadence": "RECURRING",
+  "billing_period": "ANNUAL",
+  "billing_period_count": 1,
+  "invoice_cadence": "ADVANCE",
+  "entity_type": "PLAN",
+  "entity_id": "plan_professional",
+  "display_name": "Annual Subscription (2 months free)"
+}
+```
+
+```json Usage-Based API Calls
+{
+  "currency": "usd",
+  "type": "USAGE",
+  "billing_model": "TIERED",
+  "billing_cadence": "RECURRING",
+  "billing_period": "MONTHLY",
+  "billing_period_count": 1,
+  "invoice_cadence": "ARREAR",
+  "meter_id": "meter_api_calls",
+  "tier_mode": "SLAB",
+  "entity_type": "PLAN",
+  "entity_id": "plan_payg",
+  "tiers": [
+    {"up_to": 10000, "unit_amount": "0.00"},
+    {"up_to": 100000, "unit_amount": "0.001"},
+    {"up_to": null, "unit_amount": "0.0005"}
+  ]
+}
+```
+</CodeGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Tiered Pricing" icon="layer-group" href="/pricing/tiers">
+    Deep dive into volume and slab pricing models
+  </Card>
+  
+  <Card title="Plans" icon="rectangle-list" href="/pricing/plans">
+    Organize prices into sellable plans
+  </Card>
+  
+  <Card title="Meters" icon="gauge" href="/usage/meters">
+    Track usage for consumption-based pricing
+  </Card>
+  
+  <Card title="Subscriptions" icon="repeat" href="/core-concepts/subscriptions">
+    How prices are applied to customer subscriptions
+  </Card>
+</CardGroup>

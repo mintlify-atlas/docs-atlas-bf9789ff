@@ -1,0 +1,520 @@
+---
+title: 'Credit Notes & Refunds'
+description: 'Issue credit notes, process refunds, and handle billing adjustments in FlexPrice'
+---
+
+## Overview
+
+Credit notes are documents that reduce the amount owed on an invoice. They're used for refunds, billing corrections, goodwill credits, and other adjustments. FlexPrice distinguishes between refunds (actual money returned) and adjustments (non-cash reductions).
+
+## Credit Note Structure
+
+```json
+{
+  "id": "cn_abc123",
+  "credit_note_number": "CN-2024-001",
+  "invoice_id": "inv_xyz789",
+  "customer_id": "cus_xyz789",
+  "subscription_id": "sub_premium",
+  "credit_note_type": "refund",
+  "credit_note_status": "issued",
+  "refund_status": "succeeded",
+  "reason": "duplicate",
+  "memo": "Duplicate charge - full refund issued",
+  "currency": "usd",
+  "total_amount": "100.00",
+  "finalized_at": "2024-03-10T09:00:00Z",
+  "metadata": {
+    "support_ticket": "TICKET-12345",
+    "approved_by": "manager@company.com"
+  }
+}
+```
+
+## Credit Note Types
+
+FlexPrice supports two primary types of credit notes:
+
+<Tabs>
+  <Tab title="Refund">
+    Represents actual money returned to the customer. Triggers a payment refund through the payment gateway.
+    
+    ```json
+    {
+      "credit_note_type": "refund",
+      "refund_status": "succeeded",
+      "total_amount": "100.00"
+    }
+    ```
+    
+    When issued:
+    - Payment gateway processes the refund
+    - Customer receives money back
+    - Invoice `refunded_amount` increases
+  </Tab>
+  
+  <Tab title="Adjustment">
+    Non-cash reduction to the invoice amount. Used for billing corrections, goodwill credits, or discounts.
+    
+    ```json
+    {
+      "credit_note_type": "adjustment",
+      "refund_status": null,
+      "total_amount": "50.00"
+    }
+    ```
+    
+    When issued:
+    - Invoice `adjustment_amount` increases
+    - No money changes hands
+    - Can be applied as account credit
+  </Tab>
+</Tabs>
+
+## Credit Note Status
+
+Credit notes progress through several states:
+
+<Steps>
+  <Step title="Draft">
+    Credit note is being prepared but not yet issued.
+    
+    ```json
+    {
+      "credit_note_status": "draft",
+      "finalized_at": null
+    }
+    ```
+  </Step>
+  
+  <Step title="Issued">
+    Credit note has been finalized and applied to the invoice.
+    
+    ```json
+    {
+      "credit_note_status": "issued",
+      "finalized_at": "2024-03-10T09:00:00Z"
+    }
+    ```
+  </Step>
+  
+  <Step title="Void">
+    Credit note has been voided and is no longer valid.
+    
+    ```json
+    {
+      "credit_note_status": "void",
+      "voided_at": "2024-03-11T10:00:00Z"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Refund Status
+
+For refund-type credit notes, `refund_status` tracks the payment refund:
+
+- `pending`: Refund is being processed
+- `succeeded`: Refund completed successfully
+- `failed`: Refund failed (card expired, account closed, etc.)
+
+```json
+{
+  "credit_note_type": "refund",
+  "refund_status": "succeeded",
+  "finalized_at": "2024-03-10T09:00:00Z"
+}
+```
+
+<Warning>
+Refund status only applies to `refund` type credit notes. Adjustment-type credit notes have `refund_status: null`.
+</Warning>
+
+## Credit Note Reasons
+
+The `reason` field categorizes why the credit note was issued:
+
+- `duplicate`: Duplicate charge or invoice
+- `fraudulent`: Fraudulent transaction
+- `customer_request`: Customer requested refund
+- `product_unsatisfactory`: Product/service didn't meet expectations
+- `billing_error`: Error in billing calculation
+- `goodwill`: Goodwill credit for service issues
+- `other`: Other reasons not covered above
+
+```json
+{
+  "reason": "billing_error",
+  "memo": "Incorrect usage calculation for API calls in March 2024"
+}
+```
+
+## Line Items
+
+Credit notes include line items showing which invoice charges are being credited:
+
+```json
+{
+  "line_items": [
+    {
+      "id": "cnli_1",
+      "credit_note_id": "cn_abc123",
+      "invoice_line_item_id": "ili_seat_charge",
+      "amount": "50.00",
+      "quantity": "1",
+      "description": "Partial refund for Premium Seats",
+      "currency": "usd"
+    },
+    {
+      "id": "cnli_2",
+      "credit_note_id": "cn_abc123",
+      "invoice_line_item_id": "ili_usage",
+      "amount": "50.00",
+      "quantity": "25000",
+      "description": "Refund for API usage billing error",
+      "currency": "usd"
+    }
+  ],
+  "total_amount": "100.00"
+}
+```
+
+Line items provide:
+- Granular detail on what's being credited
+- Reference to original invoice line items
+- Partial or full credit amounts
+- Supporting descriptions
+
+## Partial Credit Notes
+
+Credit notes can credit a portion of an invoice:
+
+```json
+{
+  "invoice": {
+    "id": "inv_xyz789",
+    "total": "1000.00",
+    "amount_paid": "1000.00",
+    "refunded_amount": "100.00",
+    "amount_remaining": "0.00"
+  },
+  "credit_note": {
+    "id": "cn_abc123",
+    "invoice_id": "inv_xyz789",
+    "total_amount": "100.00",
+    "credit_note_type": "refund"
+  }
+}
+```
+
+The invoice was fully paid, but $100 was refunded, leaving a net payment of $900.
+
+## Full Credit Notes
+
+Credit the entire invoice amount:
+
+```json
+{
+  "invoice": {
+    "id": "inv_xyz789",
+    "total": "1000.00",
+    "amount_paid": "1000.00",
+    "refunded_amount": "1000.00",
+    "amount_remaining": "0.00"
+  },
+  "credit_note": {
+    "id": "cn_full",
+    "invoice_id": "inv_xyz789",
+    "total_amount": "1000.00",
+    "credit_note_type": "refund",
+    "reason": "duplicate"
+  }
+}
+```
+
+## Impact on Invoices
+
+Credit notes affect invoice amounts differently based on type:
+
+<Tabs>
+  <Tab title="Refund Impact">
+    Increases the invoice's `refunded_amount`:
+    
+    ```json
+    {
+      "invoice": {
+        "total": "1000.00",
+        "amount_paid": "1000.00",
+        "refunded_amount": "150.00",
+        "adjustment_amount": "0.00"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Adjustment Impact">
+    Increases the invoice's `adjustment_amount`:
+    
+    ```json
+    {
+      "invoice": {
+        "total": "1000.00",
+        "amount_paid": "1000.00",
+        "refunded_amount": "0.00",
+        "adjustment_amount": "100.00"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Combined Impact">
+    Both types can be applied to the same invoice:
+    
+    ```json
+    {
+      "invoice": {
+        "total": "1000.00",
+        "amount_paid": "1000.00",
+        "refunded_amount": "150.00",
+        "adjustment_amount": "100.00"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Idempotency
+
+Credit note creation supports idempotency:
+
+```json
+{
+  "idempotency_key": "inv_xyz789_refund_duplicate"
+}
+```
+
+Using the same idempotency key prevents duplicate credit notes for the same issue.
+
+## Credit Note Numbers
+
+Each credit note receives a unique identifier:
+
+```json
+{
+  "credit_note_number": "CN-2024-001"
+}
+```
+
+Credit note numbers are:
+- Unique per tenant and environment
+- Sequential for easy tracking
+- Formatted for customer-facing documents
+- Enforced by database constraints
+
+## Subscription Credit Notes
+
+Credit notes can be associated with subscriptions:
+
+```json
+{
+  "subscription_id": "sub_premium",
+  "invoice_id": "inv_xyz789",
+  "reason": "proration",
+  "memo": "Proration credit from plan downgrade"
+}
+```
+
+Common subscription-related credit notes:
+- Proration credits from plan changes
+- Unused time after cancellation
+- Service interruption credits
+
+## Goodwill Credits
+
+Issue non-refund credits for service issues:
+
+```json
+{
+  "credit_note_type": "adjustment",
+  "reason": "goodwill",
+  "memo": "Credit for service outage on 2024-03-08 (4 hours downtime)",
+  "total_amount": "50.00",
+  "metadata": {
+    "incident_id": "INC-2024-0308-001",
+    "downtime_hours": "4",
+    "affected_service": "API"
+  }
+}
+```
+
+Goodwill credits:
+- Don't require payment refunds
+- Can be applied to future invoices
+- Maintain customer satisfaction
+- Are tracked separately from billing errors
+
+## Billing Error Corrections
+
+Correct billing mistakes with adjustment credit notes:
+
+```json
+{
+  "credit_note_type": "adjustment",
+  "reason": "billing_error",
+  "memo": "Correcting overcharge on API usage - incorrect tier calculation",
+  "line_items": [
+    {
+      "invoice_line_item_id": "ili_usage",
+      "amount": "150.00",
+      "description": "Usage tier miscalculation credit"
+    }
+  ]
+}
+```
+
+<Steps>
+  <Step title="Identify Error">
+    Determine the billing mistake and calculate the correct amount.
+  </Step>
+  
+  <Step title="Create Credit Note">
+    Issue an adjustment-type credit note for the difference.
+  </Step>
+  
+  <Step title="Document Reason">
+    Provide clear memo explaining the error and correction.
+  </Step>
+  
+  <Step title="Apply to Invoice">
+    Credit note automatically updates the invoice's adjustment_amount.
+  </Step>
+</Steps>
+
+## Voiding Credit Notes
+
+Credit notes can be voided if issued in error:
+
+```json
+{
+  "credit_note_status": "void",
+  "voided_at": "2024-03-11T10:00:00Z"
+}
+```
+
+Voiding a credit note:
+- Reverses its impact on the invoice
+- Cannot be undone
+- Maintains audit trail
+- Requires a new credit note if still needed
+
+<Warning>
+Voiding a refund-type credit note does NOT reverse the actual payment refund. The refund remains processed; voiding only removes the credit note's accounting impact.
+</Warning>
+
+## Memo Field
+
+The memo provides human-readable context:
+
+```json
+{
+  "memo": "Full refund for duplicate invoice INV-2024-001. Customer reported seeing two charges for the same period. Verified duplicate and issued refund."
+}
+```
+
+Best practices:
+- Explain why the credit note was issued
+- Reference related tickets or incidents
+- Include approval information if required
+- Note any follow-up actions needed
+
+## Metadata
+
+Store additional structured data:
+
+```json
+{
+  "metadata": {
+    "support_ticket_id": "TICKET-12345",
+    "approved_by": "manager@company.com",
+    "approval_date": "2024-03-10",
+    "refund_method": "original_payment_method",
+    "customer_notified": "true",
+    "notification_sent_at": "2024-03-10T09:15:00Z"
+  }
+}
+```
+
+Useful for:
+- Approval workflows
+- Audit trails
+- Customer communication tracking
+- Reporting and analytics
+
+## Refund Processing
+
+For refund-type credit notes, the payment gateway handles the actual refund:
+
+```json
+{
+  "credit_note_type": "refund",
+  "refund_status": "pending",
+  "payment_gateway": "stripe",
+  "gateway_refund_id": "re_stripe_xyz"
+}
+```
+
+Refund flow:
+1. Credit note created with `refund` type
+2. FlexPrice sends refund request to payment gateway
+3. Gateway processes refund to original payment method
+4. `refund_status` updates to `succeeded` or `failed`
+5. Invoice `refunded_amount` updates on success
+
+## Common Use Cases
+
+<Tabs>
+  <Tab title="Duplicate Charge">
+    ```json
+    {
+      "credit_note_type": "refund",
+      "reason": "duplicate",
+      "total_amount": "1000.00",
+      "memo": "Full refund for duplicate invoice"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Service Downtime">
+    ```json
+    {
+      "credit_note_type": "adjustment",
+      "reason": "goodwill",
+      "total_amount": "50.00",
+      "memo": "Credit for 4 hours of API downtime"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Proration">
+    ```json
+    {
+      "credit_note_type": "adjustment",
+      "reason": "customer_request",
+      "subscription_id": "sub_premium",
+      "total_amount": "150.00",
+      "memo": "Proration credit for plan downgrade"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Calculation Error">
+    ```json
+    {
+      "credit_note_type": "adjustment",
+      "reason": "billing_error",
+      "total_amount": "200.00",
+      "memo": "Usage calculation error - incorrect tier applied"
+    }
+    ```
+  </Tab>
+</Tabs>

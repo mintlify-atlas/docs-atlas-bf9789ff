@@ -1,0 +1,151 @@
+---
+title: Usage metering
+description: How FlexPrice tracks and aggregates usage for billing
+---
+
+Usage metering is the foundation of usage-based pricing in FlexPrice. The system ingests high-volume events, matches them to meters, and aggregates usage for billing.
+
+## Overview
+
+FlexPrice's metering system processes usage in three stages:
+
+<Steps>
+  <Step title="Event Ingestion">
+    Your application sends usage events to FlexPrice via API or SDK
+  </Step>
+  <Step title="Meter Matching">
+    Events are matched to configured meters based on event name and filters
+  </Step>
+  <Step title="Usage Aggregation">
+    FlexPrice aggregates usage according to meter configuration (sum, count, max, etc.)
+  </Step>
+</Steps>
+
+## Events
+
+Events represent individual usage occurrences:
+
+```json
+{
+  "event_name": "api_call",
+  "external_customer_id": "cust_123",
+  "timestamp": "2024-03-15T10:30:00Z",
+  "properties": {
+    "endpoint": "/v1/predictions",
+    "tokens": 1500,
+    "model": "gpt-4"
+  }
+}
+```
+
+Key event fields:
+- `event_name` - Type of usage (e.g., "api_call", "storage_used")
+- `external_customer_id` - Customer identifier
+- `timestamp` - When the usage occurred
+- `properties` - Additional metadata for filtering and aggregation
+
+<Info>
+FlexPrice can handle millions of events per day with real-time aggregation.
+</Info>
+
+## Meters
+
+Meters define how events are aggregated into billable usage:
+
+```json
+{
+  "name": "API Calls by Endpoint",
+  "event_name": "api_call",
+  "aggregation": {
+    "type": "COUNT",
+    "group_by": ["properties.endpoint"]
+  },
+  "filters": [
+    {
+      "field": "properties.endpoint",
+      "operator": "IN",
+      "values": ["/v1/predictions", "/v1/embeddings"]
+    }
+  ]
+}
+```
+
+### Aggregation Types
+
+- **COUNT** - Count number of events
+- **SUM** - Sum a numeric field
+- **MAX** - Maximum value in period
+- **LATEST** - Most recent value
+- **UNIQUE_COUNT** - Count distinct values
+- **AVG** - Average of numeric field
+
+<Tip>
+Choose the aggregation type that matches your pricing model. API calls typically use COUNT, while storage uses SUM.
+</Tip>
+
+## Real-Time Processing
+
+FlexPrice processes events through Kafka for reliability:
+
+1. Events are ingested via API
+2. Published to Kafka topic `events`
+3. Consumed by event processors
+4. Stored in ClickHouse for fast querying
+5. Aggregated according to meter configuration
+
+<Note>
+Event processing is typically complete within seconds, enabling real-time usage dashboards.
+</Note>
+
+## Usage Tracking
+
+Usage is tracked at multiple levels:
+
+- **Customer level** - Total usage across all subscriptions
+- **Subscription level** - Usage tied to a specific plan
+- **Time period** - Hourly, daily, or billing period aggregations
+- **Dimension level** - Grouped by properties (endpoint, region, etc.)
+
+## Billing Integration
+
+Metered usage flows into invoices:
+
+1. Meter aggregates usage during billing period
+2. Usage is priced according to plan configuration
+3. Line items are added to customer invoice
+4. Credits and discounts are applied
+5. Final invoice is generated
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Send Events Immediately" icon="bolt">
+    Send events as usage occurs for accurate real-time tracking
+  </Card>
+  <Card title="Use Idempotency" icon="shield-check">
+    Include unique event_id to prevent duplicate billing
+  </Card>
+  <Card title="Add Rich Properties" icon="tags">
+    Include relevant metadata for filtering and grouping
+  </Card>
+  <Card title="Monitor Ingestion" icon="chart-line">
+    Track event delivery and processing success rates
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Events Guide" href="/metering/events" icon="circle-dot">
+    Learn about event structure and ingestion
+  </Card>
+  <Card title="Meters Guide" href="/metering/meters" icon="gauge">
+    Configure meters for your use case
+  </Card>
+  <Card title="Aggregations" href="/metering/aggregations" icon="calculator">
+    Understand aggregation methods
+  </Card>
+  <Card title="Ingest Events API" href="/api/events/ingest" icon="code">
+    API reference for event ingestion
+  </Card>
+</CardGroup>

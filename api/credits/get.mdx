@@ -1,0 +1,250 @@
+---
+title: "Get Credit Grant"
+api: "GET /v1/credit-grants/{id}"
+description: "Use when you need to load a single credit grant (e.g. for display or to check balance)."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the credit grant to retrieve
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the credit grant
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the credit grant
+</ResponseField>
+
+<ResponseField name="scope" type="string">
+  Scope of the grant
+  
+  **Values:** `PLAN`, `SUBSCRIPTION`
+</ResponseField>
+
+<ResponseField name="plan_id" type="string">
+  ID of the plan (if scope is PLAN)
+</ResponseField>
+
+<ResponseField name="subscription_id" type="string">
+  ID of the subscription (if scope is SUBSCRIPTION)
+</ResponseField>
+
+<ResponseField name="credits" type="string">
+  Number of credits granted
+</ResponseField>
+
+<ResponseField name="cadence" type="string">
+  Cadence of the grant
+  
+  **Values:** `ONETIME`, `RECURRING`
+</ResponseField>
+
+<ResponseField name="period" type="string">
+  Period for recurring grants
+  
+  **Values:** `DAILY`, `WEEKLY`, `MONTHLY`, `QUARTERLY`, `YEARLY`
+</ResponseField>
+
+<ResponseField name="period_count" type="integer">
+  Number of periods for recurring grants
+</ResponseField>
+
+<ResponseField name="expiration_type" type="string">
+  How credits expire
+  
+  **Values:** `NEVER`, `DURATION`, `BILLING_CYCLE`
+</ResponseField>
+
+<ResponseField name="expiration_duration" type="integer">
+  Duration before expiration (if expiration_type is DURATION)
+</ResponseField>
+
+<ResponseField name="expiration_duration_unit" type="string">
+  Unit for expiration duration
+  
+  **Values:** `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
+</ResponseField>
+
+<ResponseField name="start_date" type="string">
+  Start date for the grant (subscription-scoped only) in ISO 8601 format
+</ResponseField>
+
+<ResponseField name="end_date" type="string">
+  End date for the grant (subscription-scoped only) in ISO 8601 format
+</ResponseField>
+
+<ResponseField name="conversion_rate" type="string">
+  Conversion rate from credits to currency during consumption
+</ResponseField>
+
+<ResponseField name="topup_conversion_rate" type="string">
+  Conversion rate for top-ups
+</ResponseField>
+
+<ResponseField name="priority" type="integer">
+  Priority for credit consumption (lower number = higher priority)
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata as key-value pairs
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Timestamp when grant was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  Timestamp when grant was last updated
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.flexprice.io/v1/credit-grants/cg_abc123xyz" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+grant = client.credit_grants.get("cg_abc123xyz")
+print(f"Grant: {grant.name} - {grant.credits} credits")
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+const grant = await client.creditGrants.get("cg_abc123xyz");
+console.log(`Grant: ${grant.name} - ${grant.credits} credits`);
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+grant, err := client.CreditGrants.Get(context.Background(), "cg_abc123xyz")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Grant: %s - %s credits\n", grant.Name, grant.Credits)
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - One-time grant
+{
+  "id": "cg_abc123xyz",
+  "name": "Welcome Bonus",
+  "scope": "SUBSCRIPTION",
+  "subscription_id": "sub_1234",
+  "credits": "100.00000000",
+  "cadence": "ONETIME",
+  "expiration_type": "DURATION",
+  "expiration_duration": 30,
+  "expiration_duration_unit": "DAYS",
+  "start_date": "2024-01-15T00:00:00Z",
+  "conversion_rate": "1.00000",
+  "priority": 1,
+  "metadata": {
+    "campaign": "new_user_2024"
+  },
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z"
+}
+```
+
+```json 200 - Recurring grant
+{
+  "id": "cg_def456uvw",
+  "name": "Monthly Plan Credits",
+  "scope": "PLAN",
+  "plan_id": "plan_enterprise",
+  "credits": "500.00000000",
+  "cadence": "RECURRING",
+  "period": "MONTHLY",
+  "period_count": 12,
+  "expiration_type": "BILLING_CYCLE",
+  "conversion_rate": "1.00000",
+  "metadata": {},
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:00Z"
+}
+```
+
+```json 404 - Not Found
+{
+  "error": {
+    "code": "not_found",
+    "message": "Credit grant not found",
+    "hint": "No credit grant exists with the provided ID"
+  }
+}
+```
+</ResponseExample>
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Verify Grant Details">
+    Before modifying or deleting a credit grant, retrieve it to confirm details:
+    
+    ```python
+    grant = client.credit_grants.get("cg_abc123xyz")
+    
+    print(f"Grant: {grant.name}")
+    print(f"Scope: {grant.scope}")
+    print(f"Credits: {grant.credits}")
+    print(f"Expires: {grant.expiration_type}")
+    
+    # Confirm before deletion
+    if input("Delete this grant? (y/n): ") == "y":
+        client.credit_grants.delete(grant.id)
+    ```
+  </Accordion>
+  
+  <Accordion title="Display Grant Information">
+    Show credit grant details to customers or in admin panels:
+    
+    ```typescript
+    const grant = await client.creditGrants.get(grantId);
+    
+    // Display in UI
+    return {
+      title: grant.name,
+      amount: `${grant.credits} credits`,
+      expiresIn: grant.expirationDuration 
+        ? `${grant.expirationDuration} ${grant.expirationDurationUnit}`
+        : "Never",
+      recurring: grant.cadence === "RECURRING",
+      period: grant.period
+    };
+    ```
+  </Accordion>
+  
+  <Accordion title="Audit Credit Grant Configuration">
+    Retrieve grant details for audit or compliance purposes:
+    
+    ```go
+    grant, err := client.CreditGrants.Get(ctx, grantID)
+    if err != nil {
+        return err
+    }
+    
+    log.Printf("Auditing grant: %s", grant.ID)
+    log.Printf("Created by: %s on %s", grant.CreatedBy, grant.CreatedAt)
+    log.Printf("Scope: %s (%s)", grant.Scope, grant.EntityID())
+    log.Printf("Credits: %s", grant.Credits)
+    log.Printf("Conversion rate: %s", grant.ConversionRate)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+- [Grant Credits](/api/credits/grant) - Create a new credit grant
+- [List Credit Grants](/api/credits/list) - List all credit grants with filters
+- [Update Credit Grant](/api/credits/update) - Modify grant name or metadata
+- [Delete Credit Grant](/api/credits/delete) - Remove or end a credit grant

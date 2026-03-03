@@ -1,0 +1,342 @@
+---
+title: "Create Subscription"
+api: "POST /v1/subscriptions"
+description: "Create a new subscription for a customer. Use when onboarding a customer to a plan or starting a new subscription. Supports draft subscriptions (activate later) or active from start."
+---
+
+## Request Body
+
+<ParamField body="customer_id" type="string">
+  FlexPrice customer ID. Required if `external_customer_id` is not provided.
+  
+  **Example:** `"cust_a1b2c3d4e5f6g7h8i9j0"`
+</ParamField>
+
+<ParamField body="external_customer_id" type="string">
+  Your internal customer ID (must match the external_id used when creating the customer). Required if `customer_id` is not provided.
+  
+  **Example:** `"customer-12345"`
+</ParamField>
+
+<ParamField body="plan_id" type="string" required>
+  ID of the plan to subscribe to.
+  
+  **Example:** `"plan_a1b2c3d4e5f6g7h8i9j0"`
+</ParamField>
+
+<ParamField body="currency" type="string" required>
+  Three-letter ISO currency code (lowercase).
+  
+  **Example:** `"usd"`
+</ParamField>
+
+<ParamField body="billing_cadence" type="string" required>
+  Billing frequency.
+  
+  **Options:** `"IN_ADVANCE"`, `"IN_ARREARS"`
+</ParamField>
+
+<ParamField body="billing_period" type="string" required>
+  Billing period unit.
+  
+  **Options:** `"DAY"`, `"WEEK"`, `"MONTH"`, `"QUARTER"`, `"YEAR"`
+</ParamField>
+
+<ParamField body="billing_period_count" type="integer" default="1">
+  Number of billing periods in each billing cycle.
+  
+  **Example:** `3` (for quarterly billing with monthly periods)
+</ParamField>
+
+<ParamField body="billing_cycle" type="string" default="ANNIVERSARY">
+  Determines billing date calculation.
+  
+  **Options:** `"ANNIVERSARY"` (uses start date), `"CALENDAR"` (uses calendar dates)
+</ParamField>
+
+<ParamField body="start_date" type="string">
+  ISO 8601 timestamp for when the subscription starts. Defaults to now.
+  
+  **Example:** `"2024-03-20T00:00:00Z"`
+</ParamField>
+
+<ParamField body="end_date" type="string">
+  ISO 8601 timestamp for when the subscription ends (optional).
+  
+  **Example:** `"2025-03-20T00:00:00Z"`
+</ParamField>
+
+<ParamField body="trial_start" type="string">
+  ISO 8601 timestamp for trial period start.
+  
+  **Example:** `"2024-03-20T00:00:00Z"`
+</ParamField>
+
+<ParamField body="trial_end" type="string">
+  ISO 8601 timestamp for trial period end.
+  
+  **Example:** `"2024-04-20T00:00:00Z"`
+</ParamField>
+
+<ParamField body="lookup_key" type="string">
+  Optional unique identifier for programmatic lookup.
+  
+  **Example:** `"customer-12345-pro-subscription"`
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Arbitrary key-value pairs for storing additional information.
+  
+  **Example:** `{"source": "website", "campaign": "spring2024"}`
+</ParamField>
+
+<ParamField body="collection_method" type="string" default="CHARGE_AUTOMATICALLY">
+  How invoices are collected.
+  
+  **Options:** `"CHARGE_AUTOMATICALLY"`, `"SEND_INVOICE"`
+</ParamField>
+
+<ParamField body="payment_behavior" type="string" default="DEFAULT_ACTIVE">
+  Payment handling behavior.
+  
+  **Options:** `"DEFAULT_ACTIVE"`, `"DEFAULT_INCOMPLETE"`, `"ALLOW_INCOMPLETE"`, `"ERROR_IF_INCOMPLETE"`
+</ParamField>
+
+<ParamField body="subscription_status" type="string">
+  Initial status. Set to "DRAFT" to create without activating.
+  
+  **Options:** `"ACTIVE"`, `"DRAFT"`, `"INCOMPLETE"`
+</ParamField>
+
+<ParamField body="commitment_amount" type="string">
+  Minimum committed amount for the billing period (decimal as string).
+  
+  **Example:** `"1000.00"`
+</ParamField>
+
+<ParamField body="commitment_duration" type="string">
+  Time frame of the commitment.
+  
+  **Options:** `"MONTH"`, `"QUARTER"`, `"YEAR"`
+</ParamField>
+
+<ParamField body="overage_factor" type="string">
+  Multiplier for usage beyond commitment (decimal as string).
+  
+  **Example:** `"1.5"`
+</ParamField>
+
+<ParamField body="enable_true_up" type="boolean" default="false">
+  Whether to apply true-up fee when usage is below commitment.
+</ParamField>
+
+<ParamField body="proration_behavior" type="string" default="NONE">
+  How proration is handled.
+  
+  **Options:** `"CREATE_PRORATIONS"`, `"NONE"`
+</ParamField>
+
+<ParamField body="customer_timezone" type="string" default="UTC">
+  Customer's timezone for billing calculations.
+  
+  **Example:** `"America/New_York"`
+</ParamField>
+
+<ParamField body="parent_subscription_id" type="string">
+  Parent subscription ID for hierarchy (e.g., child subscription under a parent).
+  
+  **Example:** `"sub_parent123"`
+</ParamField>
+
+<ParamField body="payment_terms" type="string">
+  Payment terms for invoice due date.
+  
+  **Options:** `"15_NET"`, `"30_NET"`, `"45_NET"`, `"60_NET"`, `"75_NET"`, `"90_NET"`
+</ParamField>
+
+<ParamField body="invoice_billing" type="string" default="INVOICE_TO_SELF">
+  Determines which customer receives invoices.
+  
+  **Options:** `"INVOICE_TO_PARENT"`, `"INVOICE_TO_SELF"`
+</ParamField>
+
+<ParamField body="override_line_items" type="array">
+  Customize specific prices for this subscription.
+  
+  <Expandable title="override_line_items properties">
+    <ParamField body="override_line_items[].price_id" type="string" required>
+      ID of the plan price to override.
+    </ParamField>
+    
+    <ParamField body="override_line_items[].quantity" type="string">
+      Custom quantity (decimal as string).
+    </ParamField>
+    
+    <ParamField body="override_line_items[].amount" type="string">
+      Custom amount (decimal as string).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="line_items" type="array">
+  Additional line items to add at creation (in addition to plan prices).
+  
+  <Expandable title="line_items properties">
+    <ParamField body="line_items[].price_id" type="string" required>
+      ID of the price to add.
+    </ParamField>
+    
+    <ParamField body="line_items[].quantity" type="string" required>
+      Quantity (decimal as string).
+    </ParamField>
+    
+    <ParamField body="line_items[].display_name" type="string">
+      Custom display name for this line item.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="phases" type="array">
+  Subscription phases for phased pricing.
+  
+  <Expandable title="phases properties">
+    <ParamField body="phases[].start_date" type="string" required>
+      ISO 8601 timestamp for phase start.
+    </ParamField>
+    
+    <ParamField body="phases[].end_date" type="string">
+      ISO 8601 timestamp for phase end (required for all phases except last).
+    </ParamField>
+    
+    <ParamField body="phases[].override_line_items" type="array">
+      Price overrides for this phase.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the subscription.
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  FlexPrice customer ID.
+</ResponseField>
+
+<ResponseField name="plan_id" type="string">
+  Plan ID.
+</ResponseField>
+
+<ResponseField name="subscription_status" type="string">
+  Current subscription status.
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Currency code.
+</ResponseField>
+
+<ResponseField name="billing_cadence" type="string">
+  Billing frequency.
+</ResponseField>
+
+<ResponseField name="billing_period" type="string">
+  Billing period unit.
+</ResponseField>
+
+<ResponseField name="billing_period_count" type="integer">
+  Number of billing periods per cycle.
+</ResponseField>
+
+<ResponseField name="billing_anchor" type="string">
+  ISO 8601 timestamp of the billing anchor date.
+</ResponseField>
+
+<ResponseField name="start_date" type="string">
+  ISO 8601 timestamp when subscription starts.
+</ResponseField>
+
+<ResponseField name="end_date" type="string">
+  ISO 8601 timestamp when subscription ends (if set).
+</ResponseField>
+
+<ResponseField name="current_period_start" type="string">
+  ISO 8601 timestamp of current billing period start.
+</ResponseField>
+
+<ResponseField name="current_period_end" type="string">
+  ISO 8601 timestamp of current billing period end.
+</ResponseField>
+
+<ResponseField name="trial_start" type="string">
+  ISO 8601 timestamp of trial start (if applicable).
+</ResponseField>
+
+<ResponseField name="trial_end" type="string">
+  ISO 8601 timestamp of trial end (if applicable).
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the subscription was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp when the subscription was last updated.
+</ResponseField>
+
+<ResponseField name="plan" type="object">
+  Plan details (if included).
+</ResponseField>
+
+<ResponseField name="customer" type="object">
+  Customer details (if included).
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request POST \
+  --url https://api.flexprice.io/v1/subscriptions \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "customer_id": "cust_a1b2c3d4e5f6g7h8i9j0",
+    "plan_id": "plan_a1b2c3d4e5f6g7h8i9j0",
+    "currency": "usd",
+    "billing_cadence": "IN_ADVANCE",
+    "billing_period": "MONTH",
+    "billing_period_count": 1,
+    "start_date": "2024-03-20T00:00:00Z",
+    "metadata": {
+      "source": "website"
+    }
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "sub_x1y2z3a4b5c6d7e8f9g0",
+  "customer_id": "cust_a1b2c3d4e5f6g7h8i9j0",
+  "plan_id": "plan_a1b2c3d4e5f6g7h8i9j0",
+  "subscription_status": "ACTIVE",
+  "currency": "usd",
+  "billing_cadence": "IN_ADVANCE",
+  "billing_period": "MONTH",
+  "billing_period_count": 1,
+  "billing_anchor": "2024-03-20T00:00:00Z",
+  "start_date": "2024-03-20T00:00:00Z",
+  "current_period_start": "2024-03-20T00:00:00Z",
+  "current_period_end": "2024-04-20T00:00:00Z",
+  "metadata": {
+    "source": "website"
+  },
+  "created_at": "2024-03-20T15:04:05Z",
+  "updated_at": "2024-03-20T15:04:05Z"
+}
+```

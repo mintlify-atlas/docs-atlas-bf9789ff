@@ -1,0 +1,198 @@
+---
+title: "Cancel Subscription"
+api: "PUT /v1/subscriptions/{id}/cancel"
+description: "Cancel a subscription. Use when a customer churns or downgrades. Supports immediate or end-of-period cancellation with optional proration."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique identifier of the subscription to cancel.
+  
+  **Example:** `"sub_x1y2z3a4b5c6d7e8f9g0"`
+</ParamField>
+
+## Request Body
+
+<ParamField body="cancellation_type" type="string" required>
+  When the cancellation takes effect.
+  
+  **Options:**
+  - `"IMMEDIATE"` - Cancel immediately
+  - `"END_OF_PERIOD"` - Cancel at the end of the current billing period
+</ParamField>
+
+<ParamField body="proration_behavior" type="string" default="NONE">
+  How to handle proration when cancelling.
+  
+  **Options:**
+  - `"NONE"` - No proration
+  - `"CREATE_PRORATIONS"` - Generate proration credits/charges
+</ParamField>
+
+<ParamField body="cancel_immediately_inovice_policy" type="string" default="SKIP">
+  Whether to generate a final invoice on immediate cancellation.
+  
+  **Options:**
+  - `"SKIP"` - Do not generate invoice
+  - `"GENERATE"` - Generate final invoice
+</ParamField>
+
+<ParamField body="reason" type="string">
+  Reason for cancellation (for audit and business intelligence).
+  
+  **Example:** `"Customer requested cancellation"`
+</ParamField>
+
+## Response
+
+<ResponseField name="subscription_id" type="string">
+  ID of the cancelled subscription.
+</ResponseField>
+
+<ResponseField name="cancellation_type" type="string">
+  Type of cancellation performed.
+</ResponseField>
+
+<ResponseField name="effective_date" type="string">
+  ISO 8601 timestamp when the cancellation takes effect.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  New status of the subscription.
+  
+  **Values:** `"CANCELLED"`, `"ACTIVE"` (if cancelling at period end)
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Reason for cancellation (if provided).
+</ResponseField>
+
+<ResponseField name="proration_invoice" type="object">
+  Proration invoice details (if proration was applied).
+</ResponseField>
+
+<ResponseField name="proration_details" type="array">
+  Array of line-item level proration information.
+  
+  <Expandable title="proration_details properties">
+    <ResponseField name="line_item_id" type="string">
+      Line item ID.
+    </ResponseField>
+    
+    <ResponseField name="price_id" type="string">
+      Price ID.
+    </ResponseField>
+    
+    <ResponseField name="plan_name" type="string">
+      Plan name.
+    </ResponseField>
+    
+    <ResponseField name="original_amount" type="string">
+      Original amount (decimal as string).
+    </ResponseField>
+    
+    <ResponseField name="credit_amount" type="string">
+      Credit amount (decimal as string).
+    </ResponseField>
+    
+    <ResponseField name="charge_amount" type="string">
+      Charge amount (decimal as string).
+    </ResponseField>
+    
+    <ResponseField name="proration_days" type="integer">
+      Number of days used for proration calculation.
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Description of the proration.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total_credit_amount" type="string">
+  Total credit amount from proration (decimal as string).
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable message about the cancellation.
+</ResponseField>
+
+<ResponseField name="processed_at" type="string">
+  ISO 8601 timestamp when the cancellation was processed.
+</ResponseField>
+
+## Example Request - Immediate Cancellation
+
+```bash cURL
+curl --request PUT \
+  --url https://api.flexprice.io/v1/subscriptions/sub_x1y2z3a4b5c6d7e8f9g0/cancel \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "cancellation_type": "IMMEDIATE",
+    "proration_behavior": "CREATE_PRORATIONS",
+    "reason": "Customer requested cancellation"
+  }'
+```
+
+## Example Request - End of Period Cancellation
+
+```bash cURL
+curl --request PUT \
+  --url https://api.flexprice.io/v1/subscriptions/sub_x1y2z3a4b5c6d7e8f9g0/cancel \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "cancellation_type": "END_OF_PERIOD",
+    "reason": "Customer requested to cancel at end of billing period"
+  }'
+```
+
+## Example Response - Immediate Cancellation with Proration
+
+```json
+{
+  "subscription_id": "sub_x1y2z3a4b5c6d7e8f9g0",
+  "cancellation_type": "IMMEDIATE",
+  "effective_date": "2024-03-25T14:30:00Z",
+  "status": "CANCELLED",
+  "reason": "Customer requested cancellation",
+  "proration_invoice": {
+    "id": "inv_proration123",
+    "amount_due": "-25.00",
+    "currency": "usd"
+  },
+  "proration_details": [
+    {
+      "line_item_id": "li_abc123",
+      "price_id": "price_xyz789",
+      "plan_name": "Pro Plan",
+      "original_amount": "99.00",
+      "credit_amount": "25.00",
+      "charge_amount": "0.00",
+      "proration_days": 8,
+      "description": "Credit for unused time (March 25-31)"
+    }
+  ],
+  "total_credit_amount": "25.00",
+  "message": "Subscription cancelled successfully with proration credit applied",
+  "processed_at": "2024-03-25T14:30:15Z"
+}
+```
+
+## Example Response - End of Period Cancellation
+
+```json
+{
+  "subscription_id": "sub_x1y2z3a4b5c6d7e8f9g0",
+  "cancellation_type": "END_OF_PERIOD",
+  "effective_date": "2024-04-20T00:00:00Z",
+  "status": "ACTIVE",
+  "reason": "Customer requested to cancel at end of billing period",
+  "proration_details": [],
+  "total_credit_amount": "0.00",
+  "message": "Subscription will be cancelled at the end of the current period",
+  "processed_at": "2024-03-25T14:30:15Z"
+}
+```

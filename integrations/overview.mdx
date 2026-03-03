@@ -1,0 +1,136 @@
+---
+title: 'Integrations Overview'
+description: 'Connect FlexPrice with payment providers, CRMs, and accounting platforms'
+---
+
+FlexPrice provides native integrations with popular payment processors, CRM platforms, and accounting systems to streamline your billing operations.
+
+## Supported Integrations
+
+FlexPrice supports the following integration providers:
+
+<CardGroup cols={2}>
+  <Card title="Stripe" icon="stripe" href="/integrations/stripe">
+    Payment processing and subscription management
+  </Card>
+  <Card title="Razorpay" icon="credit-card">
+    Payment gateway for India and Southeast Asia
+  </Card>
+  <Card title="HubSpot" icon="hubspot">
+    CRM sync for customers, deals, and quotes
+  </Card>
+  <Card title="QuickBooks" icon="book">
+    Accounting integration for invoices and payments
+  </Card>
+  <Card title="Chargebee" icon="receipt">
+    Subscription billing and invoice management
+  </Card>
+  <Card title="Moyasar" icon="wallet">
+    Payment gateway for Saudi Arabia
+  </Card>
+  <Card title="Nomod" icon="building">
+    Enterprise payment processing
+  </Card>
+</CardGroup>
+
+## Integration Capabilities
+
+### Bidirectional Sync
+
+Many integrations support bidirectional synchronization:
+
+- **Customer Management** - Sync customer data between FlexPrice and your payment provider
+- **Invoice Sync** - Push FlexPrice invoices to external systems for payment collection
+- **Payment Reconciliation** - Automatically record payments made through external systems
+- **Plan/Product Sync** - Import pricing plans from external platforms
+- **Subscription Management** - Keep subscription status in sync across systems
+
+### Webhook-Based Updates
+
+Integrations use webhooks for real-time updates:
+
+- Receive instant notifications when payments succeed or fail
+- Track subscription changes (created, updated, cancelled)
+- Monitor customer lifecycle events
+- Handle payment method updates
+
+## Integration Architecture
+
+FlexPrice uses a factory pattern to manage integrations:
+
+```go
+// Get a specific integration
+stripeIntegration, err := factory.GetStripeIntegration(ctx)
+
+// Access integration services
+stripeIntegration.CustomerSvc     // Customer operations
+stripeIntegration.PaymentSvc      // Payment processing
+stripeIntegration.InvoiceSyncSvc  // Invoice sync
+stripeIntegration.WebhookHandler  // Webhook handling
+```
+
+### Entity Integration Mapping
+
+FlexPrice maintains a mapping table to track relationships between FlexPrice entities and external provider entities:
+
+```go
+type EntityIntegrationMapping struct {
+    EntityID         string  // FlexPrice entity ID (customer, invoice, etc.)
+    EntityType       string  // customer, plan, invoice, subscription
+    ProviderType     string  // stripe, razorpay, hubspot, etc.
+    ProviderEntityID string  // External provider's entity ID
+    Metadata         map     // Additional sync context
+}
+```
+
+This enables:
+- Lookup of external IDs for syncing
+- Preventing duplicate entity creation
+- Tracking sync direction and history
+- Efficient webhook processing
+
+## Connection Configuration
+
+Each integration requires a connection to be configured in your environment:
+
+<Steps>
+  <Step title="Create Connection">
+    Configure API credentials for your integration provider through the FlexPrice dashboard or API.
+  </Step>
+  
+  <Step title="Configure Sync Settings">
+    Enable specific sync directions:
+    - Customer inbound/outbound
+    - Invoice inbound/outbound
+    - Plan inbound/outbound
+    - Subscription inbound/outbound
+  </Step>
+  
+  <Step title="Set Up Webhooks">
+    Configure webhook endpoints in your provider's dashboard to receive real-time updates.
+  </Step>
+  
+  <Step title="Test Integration">
+    Verify the connection by performing test operations and monitoring sync status.
+  </Step>
+</Steps>
+
+## Security
+
+Integrations are secured through:
+
+- **Encrypted Credentials** - All API keys and secrets are encrypted at rest
+- **Webhook Signature Verification** - Incoming webhooks are validated using provider-specific signatures
+- **Environment Isolation** - Each environment maintains separate integration configurations
+- **Audit Logging** - All integration operations are logged for compliance
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Stripe Integration" icon="stripe" href="/integrations/stripe">
+    Set up Stripe for payment processing
+  </Card>
+  <Card title="Webhook Configuration" icon="webhook" href="/integrations/webhooks">
+    Configure webhooks for real-time updates
+  </Card>
+</CardGroup>

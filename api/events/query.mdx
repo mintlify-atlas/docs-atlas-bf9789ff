@@ -1,0 +1,392 @@
+---
+title: "Query Events"
+api: "GET /v1/events"
+description: "Retrieve and filter ingested usage events"
+---
+
+Retrieve raw events that have been ingested into FlexPrice. Use this for debugging ingestion, building usage dashboards, or exporting event data for analysis.
+
+## Use Cases
+
+- Debug event ingestion and verify data
+- Build customer usage dashboards
+- Export events for external analytics
+- Audit event history for support tickets
+- Verify property values and timestamps
+
+## Query Parameters
+
+<ParamField query="external_customer_id" type="string">
+  Filter events by your customer identifier. Returns events for a specific customer.
+</ParamField>
+
+<ParamField query="event_name" type="string">
+  Filter by event type (e.g., `api_request`, `storage_usage`).
+</ParamField>
+
+<ParamField query="event_id" type="string">
+  Retrieve a specific event by its idempotency key.
+</ParamField>
+
+<ParamField query="start_time" type="string">
+  ISO 8601 timestamp for the start of the time range. Defaults to 7 days ago if not provided.
+  
+  Example: `2024-03-13T00:00:00Z`
+</ParamField>
+
+<ParamField query="end_time" type="string">
+  ISO 8601 timestamp for the end of the time range. Defaults to current time if not provided.
+  
+  Example: `2024-03-20T23:59:59Z`
+</ParamField>
+
+<ParamField query="source" type="string">
+  Filter by event source (e.g., `api`, `mobile_app`, `webhook`).
+</ParamField>
+
+<ParamField query="property_filters" type="string">
+  Filter events by properties. Format: `key1:value1,value2;key2:value3`
+  
+  Examples:
+  - `status:200,201` - Events where status is 200 or 201
+  - `region:us-east-1;tier:premium` - Events from us-east-1 AND premium tier
+</ParamField>
+
+<ParamField query="page_size" type="integer">
+  Number of events to return per page. Default: 50, max: 50.
+</ParamField>
+
+<ParamField query="offset" type="integer">
+  Number of events to skip for pagination. Default: 0.
+</ParamField>
+
+<ParamField query="sort" type="string">
+  Field to sort by. Allowed values: `timestamp`, `event_name`. Default: `timestamp`.
+  
+  Case-sensitive.
+</ParamField>
+
+<ParamField query="order" type="string">
+  Sort order. Allowed values: `asc`, `desc`. Default: `desc`.
+  
+  Case-sensitive.
+</ParamField>
+
+<ParamField query="count_total" type="boolean">
+  If `true`, includes the total count of matching events in the response. Default: `false`.
+  
+  Note: Counting can be slow for large datasets.
+</ParamField>
+
+<ParamField query="iter_first_key" type="string">
+  For cursor-based pagination. Use the `iter_first_key` from the previous response to get the next page.
+</ParamField>
+
+<ParamField query="iter_last_key" type="string">
+  For cursor-based pagination. Use the `iter_last_key` from the previous response.
+</ParamField>
+
+## Response
+
+<ResponseField name="events" type="array">
+  Array of event objects matching the query filters.
+</ResponseField>
+
+<ResponseField name="events[].id" type="string">
+  Unique event identifier.
+</ResponseField>
+
+<ResponseField name="events[].event_name" type="string">
+  Type of event (e.g., `api_request`).
+</ResponseField>
+
+<ResponseField name="events[].external_customer_id" type="string">
+  Customer identifier from your system.
+</ResponseField>
+
+<ResponseField name="events[].customer_id" type="string">
+  FlexPrice's internal customer ID.
+</ResponseField>
+
+<ResponseField name="events[].timestamp" type="string">
+  ISO 8601 timestamp when the event occurred.
+</ResponseField>
+
+<ResponseField name="events[].properties" type="object">
+  Key-value pairs with event metadata.
+</ResponseField>
+
+<ResponseField name="events[].source" type="string">
+  Event source identifier.
+</ResponseField>
+
+<ResponseField name="events[].environment_id" type="string">
+  Environment where the event was ingested (e.g., production, staging).
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  Whether there are more events to fetch. Use for pagination.
+</ResponseField>
+
+<ResponseField name="iter_first_key" type="string">
+  Cursor for the first event in the current page. Use for cursor-based pagination.
+</ResponseField>
+
+<ResponseField name="iter_last_key" type="string">
+  Cursor for the last event in the current page. Use for cursor-based pagination.
+</ResponseField>
+
+<ResponseField name="total_count" type="integer">
+  Total number of events matching the query. Only present if `count_total=true`.
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Current offset for offset-based pagination.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL - Basic Query
+curl -X GET "https://us.api.flexprice.io/v1/events?external_customer_id=customer_123&start_time=2024-03-13T00:00:00Z&end_time=2024-03-20T23:59:59Z" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - With Filters
+curl -X GET "https://us.api.flexprice.io/v1/events?event_name=api_request&property_filters=status:200,201;method:GET&page_size=20&sort=timestamp&order=desc" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```javascript Node.js
+import { Flexprice } from '@flexprice/sdk';
+
+const client = new Flexprice({
+  apiKey: process.env.FLEXPRICE_API_KEY,
+  serverURL: 'https://us.api.flexprice.io/v1'
+});
+
+const response = await client.events.query({
+  externalCustomerId: 'customer_123',
+  eventName: 'api_request',
+  startTime: new Date('2024-03-13T00:00:00Z'),
+  endTime: new Date('2024-03-20T23:59:59Z'),
+  pageSize: 50,
+  sort: 'timestamp',
+  order: 'desc'
+});
+
+console.log(`Found ${response.events.length} events`);
+if (response.hasMore) {
+  console.log('More events available');
+}
+```
+
+```python Python
+from flexprice import Flexprice
+from datetime import datetime
+import os
+
+client = Flexprice(
+    api_key=os.environ['FLEXPRICE_API_KEY'],
+    server_url='https://us.api.flexprice.io/v1'
+)
+
+response = client.events.query(
+    external_customer_id='customer_123',
+    event_name='api_request',
+    start_time=datetime.fromisoformat('2024-03-13T00:00:00Z'),
+    end_time=datetime.fromisoformat('2024-03-20T23:59:59Z'),
+    page_size=50,
+    sort='timestamp',
+    order='desc'
+)
+
+print(f"Found {len(response.events)} events")
+if response.has_more:
+    print('More events available')
+```
+
+```go Go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    flexprice "github.com/flexprice/go-sdk"
+)
+
+func main() {
+    client := flexprice.New(
+        flexprice.WithAPIKey(os.Getenv("FLEXPRICE_API_KEY")),
+        flexprice.WithServerURL("https://us.api.flexprice.io/v1"),
+    )
+
+    startTime, _ := time.Parse(time.RFC3339, "2024-03-13T00:00:00Z")
+    endTime, _ := time.Parse(time.RFC3339, "2024-03-20T23:59:59Z")
+    
+    response, err := client.Events.Query(context.Background(), &flexprice.GetEventsRequest{
+        ExternalCustomerID: flexprice.String("customer_123"),
+        EventName:          flexprice.String("api_request"),
+        StartTime:          &startTime,
+        EndTime:            &endTime,
+        PageSize:           flexprice.Int(50),
+        Sort:               flexprice.String("timestamp"),
+        Order:              flexprice.String("desc"),
+    })
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Printf("Found %d events\n", len(response.Events))
+    if response.HasMore {
+        fmt.Println("More events available")
+    }
+}
+```
+</CodeGroup>
+
+## Pagination
+
+FlexPrice supports two pagination methods:
+
+### Offset-Based Pagination
+
+Simple but less efficient for large datasets:
+
+```javascript
+// Page 1
+const page1 = await client.events.query({
+  externalCustomerId: 'customer_123',
+  pageSize: 50,
+  offset: 0
+});
+
+// Page 2
+const page2 = await client.events.query({
+  externalCustomerId: 'customer_123',
+  pageSize: 50,
+  offset: 50
+});
+```
+
+### Cursor-Based Pagination
+
+More efficient for large datasets:
+
+```javascript
+// Page 1
+const page1 = await client.events.query({
+  externalCustomerId: 'customer_123',
+  pageSize: 50
+});
+
+// Page 2 - use cursor from page 1
+if (page1.hasMore) {
+  const page2 = await client.events.query({
+    externalCustomerId: 'customer_123',
+    pageSize: 50,
+    iterFirstKey: page1.iterLastKey
+  });
+}
+```
+
+## Property Filters
+
+Filter events by properties using the `property_filters` parameter:
+
+```bash
+# Single filter with multiple values (OR)
+property_filters=status:200,201,204
+
+# Multiple filters (AND)
+property_filters=status:200;region:us-east-1
+
+# Complex filter
+property_filters=tier:premium,enterprise;method:GET,POST;region:us-east-1
+```
+
+## Response Example
+
+```json
+{
+  "events": [
+    {
+      "id": "evt_abc123",
+      "event_name": "api_request",
+      "external_customer_id": "customer_123",
+      "customer_id": "cust_xyz789",
+      "timestamp": "2024-03-20T15:04:05Z",
+      "properties": {
+        "endpoint": "/v1/users",
+        "method": "GET",
+        "status": 200,
+        "response_time_ms": 45
+      },
+      "source": "api",
+      "environment_id": "env_prod"
+    },
+    {
+      "id": "evt_def456",
+      "event_name": "api_request",
+      "external_customer_id": "customer_123",
+      "customer_id": "cust_xyz789",
+      "timestamp": "2024-03-20T15:08:12Z",
+      "properties": {
+        "endpoint": "/v1/orders",
+        "method": "POST",
+        "status": 201,
+        "response_time_ms": 120
+      },
+      "source": "api",
+      "environment_id": "env_prod"
+    }
+  ],
+  "has_more": true,
+  "iter_first_key": "eyJ0aW1lc3RhbXAiOiIyMDI0LTAzLTIwVDE1OjA0OjA1WiIsImlkIjoiZXZ0X2FiYzEyMyJ9",
+  "iter_last_key": "eyJ0aW1lc3RhbXAiOiIyMDI0LTAzLTIwVDE1OjA4OjEyWiIsImlkIjoiZXZ0X2RlZjQ1NiJ9",
+  "offset": 0
+}
+```
+
+## Response Codes
+
+<ResponseField name="200" type="OK">
+  Successfully retrieved events.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  Invalid query parameters. Check:
+  - `start_time` and `end_time` format
+  - `sort` field is valid (timestamp or event_name)
+  - `order` is valid (asc or desc)
+  - `property_filters` format
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Missing or invalid API key.
+</ResponseField>
+
+<ResponseField name="500" type="Server Error">
+  Internal server error.
+</ResponseField>
+
+## Best Practices
+
+1. **Use time ranges**: Always specify `start_time` and `end_time` for predictable results and better performance.
+
+2. **Cursor pagination for large datasets**: Use `iter_first_key` and `iter_last_key` instead of offset for better performance when fetching many pages.
+
+3. **Avoid count_total in production**: Counting all matching events can be slow. Only use when necessary.
+
+4. **Filter early**: Apply filters like `event_name` and `external_customer_id` to reduce the result set size.
+
+5. **Cache results**: If displaying events in a dashboard, consider caching the response to avoid repeated API calls.
+
+## Related
+
+- [Ingest Event](/api/events/ingest) - Send a single event
+- [Batch Ingest Events](/api/events/batch) - Send multiple events
+- [Usage Analytics](/api/analytics) - Aggregate and analyze event data

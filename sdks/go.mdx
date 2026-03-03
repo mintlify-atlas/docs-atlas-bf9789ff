@@ -1,0 +1,320 @@
+---
+title: Go SDK
+description: Type-safe Go client for FlexPrice billing and metering
+---
+
+## Installation
+
+Install the FlexPrice Go SDK using `go get`:
+
+```bash
+go get github.com/flexprice/flexprice-go/v2
+```
+
+**Requirements:**
+- Go 1.20 or higher
+- Go modules enabled
+
+## Quick Start
+
+Initialize the client and ingest an event:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/flexprice/flexprice-go/v2"
+	"github.com/flexprice/flexprice-go/v2/models/types"
+	"github.com/joho/godotenv"
+)
+
+func main() {
+	godotenv.Load()
+
+	apiKey := os.Getenv("FLEXPRICE_API_KEY")
+	apiHost := os.Getenv("FLEXPRICE_API_HOST")
+	if apiHost == "" {
+		apiHost = "https://us.api.flexprice.io/v1"
+	}
+	if apiKey == "" {
+		log.Fatal("Set FLEXPRICE_API_KEY in .env or environment")
+	}
+
+	client := flexprice.New(apiHost, flexprice.WithSecurity(apiKey))
+	ctx := context.Background()
+
+	customerID := fmt.Sprintf("customer-%d", time.Now().Unix())
+
+	// Ingest an event
+	req := types.DtoIngestEventRequest{
+		EventName:          "api_request",
+		ExternalCustomerID: customerID,
+		Properties:         map[string]string{"endpoint": "/api/v1/resource", "method": "POST"},
+	}
+
+	resp, err := client.Events.IngestEvent(ctx, req)
+	if err != nil {
+		log.Fatalf("IngestEvent error: %v", err)
+	}
+
+	if resp != nil && resp.RawResponse != nil && resp.RawResponse.StatusCode == 202 {
+		fmt.Println("Event ingested successfully (202 Accepted)")
+	}
+}
+```
+
+## Initialization
+
+Create a FlexPrice client with your API key:
+
+```go
+import "github.com/flexprice/flexprice-go/v2"
+
+// Basic initialization
+client := flexprice.New(
+	"https://us.api.flexprice.io/v1",
+	flexprice.WithSecurity(os.Getenv("FLEXPRICE_API_KEY")),
+)
+```
+
+<Note>
+  The base URL must include `/v1` and have no trailing slash: `https://us.api.flexprice.io/v1`
+</Note>
+
+## Creating a Customer
+
+```go
+import "github.com/flexprice/flexprice-go/v2/models/types"
+
+customerReq := types.DtoCreateCustomerRequest{
+	ExternalID: "customer-123",
+	Email:      "user@example.com",
+	Name:       "Example Customer",
+}
+
+customer, err := client.Customers.CreateCustomer(ctx, customerReq)
+if err != nil {
+	log.Fatalf("Failed to create customer: %v", err)
+}
+
+fmt.Printf("Created customer: %s\n", customer.ID)
+```
+
+## Ingesting Events
+
+### Single Event
+
+```go
+req := types.DtoIngestEventRequest{
+	EventName:          "api_request",
+	ExternalCustomerID: "customer-123",
+	Properties: map[string]string{
+		"endpoint": "/api/data",
+		"method":   "GET",
+		"status":   "200",
+	},
+	Source: "backend_api",
+}
+
+resp, err := client.Events.IngestEvent(ctx, req)
+if err != nil {
+	log.Fatalf("Event ingestion failed: %v", err)
+}
+```
+
+### High-Volume Events (Async Client)
+
+For high-throughput event ingestion, use the async client with automatic batching:
+
+```go
+// Configure async client
+asyncConfig := flexprice.DefaultAsyncConfig()
+asyncConfig.Debug = true
+asyncConfig.BatchSize = 100
+asyncConfig.FlushInterval = 5 * time.Second
+
+asyncClient := client.NewAsyncClientWithConfig(asyncConfig)
+defer asyncClient.Close() // Flush remaining events
+
+// Simple event ingestion
+err := asyncClient.Enqueue(
+	"api_request",
+	"customer-123",
+	map[string]interface{}{
+		"path":   "/api/resource",
+		"method": "POST",
+		"status": 201,
+	},
+)
+if err != nil {
+	log.Printf("Enqueue error: %v", err)
+}
+
+// Event with full options
+err = asyncClient.EnqueueWithOptions(flexprice.EventOptions{
+	EventName:          "file_upload",
+	ExternalCustomerID: "customer-123",
+	Properties: map[string]interface{}{
+		"file_size_bytes": 1048576,
+		"file_type":       "pdf",
+	},
+	Source:    "upload_service",
+	Timestamp: time.Now().Format(time.RFC3339),
+})
+```
+
+<Note>
+  The async client batches events and sends them in the background. Always call `Close()` before your application exits to ensure all events are flushed.
+</Note>
+
+## Error Handling
+
+```go
+resp, err := client.Events.IngestEvent(ctx, req)
+if err != nil {
+	// Handle SDK or network errors
+	log.Printf("Error: %v", err)
+	return
+}
+
+if resp.RawResponse.StatusCode != 202 {
+	// Handle unexpected status codes
+	log.Printf("Unexpected status: %d", resp.RawResponse.StatusCode)
+}
+```
+
+## Common Operations
+
+<CodeGroup>
+```go List Customers
+params := types.ListCustomersRequest{
+	PageSize: flexprice.Int64(50),
+}
+
+customers, err := client.Customers.ListCustomers(ctx, params)
+if err != nil {
+	log.Fatalf("List customers error: %v", err)
+}
+
+for _, customer := range customers.Customers {
+	fmt.Printf("Customer: %s (%s)\n", customer.Name, customer.ExternalID)
+}
+```
+
+```go Create Subscription
+subReq := types.DtoCreateSubscriptionRequest{
+	CustomerID: customerID,
+	PlanID:     planID,
+	StartDate:  time.Now().Format(time.RFC3339),
+}
+
+subscription, err := client.Subscriptions.CreateSubscription(ctx, subReq)
+if err != nil {
+	log.Fatalf("Create subscription error: %v", err)
+}
+```
+
+```go List Invoices
+params := types.ListInvoicesRequest{
+	CustomerID: flexprice.String(customerID),
+	PageSize:   flexprice.Int64(20),
+}
+
+invoices, err := client.Invoices.ListInvoices(ctx, params)
+if err != nil {
+	log.Fatalf("List invoices error: %v", err)
+}
+```
+</CodeGroup>
+
+## Configuration Options
+
+```go
+client := flexprice.New(
+	"https://us.api.flexprice.io/v1",
+	flexprice.WithSecurity(apiKey),
+	// Add custom options here
+)
+
+// Async client configuration
+asyncConfig := flexprice.DefaultAsyncConfig()
+asyncConfig.BatchSize = 200          // Events per batch
+asyncConfig.FlushInterval = 10 * time.Second  // Max time before flush
+asyncConfig.MaxRetries = 3           // Retry failed batches
+asyncConfig.Debug = true             // Enable debug logging
+
+asyncClient := client.NewAsyncClientWithConfig(asyncConfig)
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use environment variables">
+    Store API keys in environment variables, never hardcode them:
+    ```go
+    apiKey := os.Getenv("FLEXPRICE_API_KEY")
+    ```
+  </Step>
+  
+  <Step title="Use async client for high volume">
+    For applications ingesting thousands of events per second, use the async client with batching
+  </Step>
+  
+  <Step title="Always call Close()">
+    When using the async client, defer `Close()` to ensure all events are flushed:
+    ```go
+    defer asyncClient.Close()
+    ```
+  </Step>
+  
+  <Step title="Handle context properly">
+    Pass context for cancellation and timeouts:
+    ```go
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Missing or invalid API key">
+    Ensure `FLEXPRICE_API_KEY` is set and the key is active. Keys are for server-side use only.
+  </Accordion>
+  
+  <Accordion title="Wrong base URL">
+    Use `https://us.api.flexprice.io/v1` (include `/v1`, no trailing slash)
+  </Accordion>
+  
+  <Accordion title="Event not returning 202">
+    Event ingestion returns `202 Accepted`. Check:
+    - `EventName` is provided
+    - `ExternalCustomerID` exists
+    - `Properties` is a valid map
+  </Accordion>
+  
+  <Accordion title="Async events not sent">
+    Ensure you call `asyncClient.Close()` before application exit to flush remaining events
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="https://docs.flexprice.io">
+    Complete FlexPrice API documentation
+  </Card>
+  <Card title="Go SDK Examples" icon="code" href="https://github.com/flexprice/flexprice-go/tree/main/examples">
+    Sample code and integration examples
+  </Card>
+  <Card title="Go Package Docs" icon="golang" href="https://pkg.go.dev/github.com/flexprice/flexprice-go/v2">
+    Full Go SDK reference on pkg.go.dev
+  </Card>
+</CardGroup>

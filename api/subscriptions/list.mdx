@@ -1,0 +1,149 @@
+---
+title: "List Subscriptions"
+api: "GET /v1/subscriptions"
+description: "Retrieve a paginated list of subscriptions. Supports filtering by customer, plan, and status."
+---
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default="10">
+  Maximum number of subscriptions to return.
+  
+  **Example:** `20`
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of subscriptions to skip before starting to return results.
+  
+  **Example:** `10`
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Cursor for pagination (alternative to offset).
+</ParamField>
+
+<ParamField query="customer_id" type="string">
+  Filter by customer ID.
+  
+  **Example:** `"cust_a1b2c3d4e5f6g7h8i9j0"`
+</ParamField>
+
+<ParamField query="plan_id" type="string">
+  Filter by plan ID.
+  
+  **Example:** `"plan_a1b2c3d4e5f6g7h8i9j0"`
+</ParamField>
+
+<ParamField query="subscription_status" type="string">
+  Filter by subscription status.
+  
+  **Options:** `"ACTIVE"`, `"CANCELLED"`, `"INCOMPLETE"`, `"EXPIRED"`, `"PAUSED"`, `"DRAFT"`
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of subscription objects.
+  
+  <Expandable title="subscription properties">
+    <ResponseField name="id" type="string">
+      Unique identifier for the subscription.
+    </ResponseField>
+    
+    <ResponseField name="customer_id" type="string">
+      FlexPrice customer ID.
+    </ResponseField>
+    
+    <ResponseField name="plan_id" type="string">
+      Plan ID.
+    </ResponseField>
+    
+    <ResponseField name="subscription_status" type="string">
+      Current subscription status.
+    </ResponseField>
+    
+    <ResponseField name="currency" type="string">
+      Currency code.
+    </ResponseField>
+    
+    <ResponseField name="billing_cadence" type="string">
+      Billing frequency.
+    </ResponseField>
+    
+    <ResponseField name="billing_period" type="string">
+      Billing period unit.
+    </ResponseField>
+    
+    <ResponseField name="start_date" type="string">
+      ISO 8601 timestamp when subscription starts.
+    </ResponseField>
+    
+    <ResponseField name="current_period_start" type="string">
+      ISO 8601 timestamp of current billing period start.
+    </ResponseField>
+    
+    <ResponseField name="current_period_end" type="string">
+      ISO 8601 timestamp of current billing period end.
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp when the subscription was created.
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp when the subscription was last updated.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of subscriptions matching the query.
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  Maximum number of results returned.
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Number of results skipped.
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  Whether there are more results available.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request GET \
+  --url 'https://api.flexprice.io/v1/subscriptions?limit=20&customer_id=cust_a1b2c3d4e5f6g7h8i9j0' \
+  --header 'Authorization: Bearer <token>'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    {
+      "id": "sub_x1y2z3a4b5c6d7e8f9g0",
+      "customer_id": "cust_a1b2c3d4e5f6g7h8i9j0",
+      "plan_id": "plan_a1b2c3d4e5f6g7h8i9j0",
+      "subscription_status": "ACTIVE",
+      "currency": "usd",
+      "billing_cadence": "IN_ADVANCE",
+      "billing_period": "MONTH",
+      "billing_period_count": 1,
+      "start_date": "2024-03-20T00:00:00Z",
+      "current_period_start": "2024-03-20T00:00:00Z",
+      "current_period_end": "2024-04-20T00:00:00Z",
+      "created_at": "2024-03-20T15:04:05Z",
+      "updated_at": "2024-03-20T15:04:05Z"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
+}
+```

@@ -1,0 +1,591 @@
+---
+title: 'Features'
+description: 'Manage feature access and usage limits across plans'
+---
+
+## Overview
+
+Features in FlexPrice define capabilities that can be included in plans and controlled through entitlements. They enable feature flagging, usage limits, and access control based on what customers have purchased.
+
+## Feature Types
+
+FlexPrice supports three types of features, each serving different use cases:
+
+<CardGroup cols={3}>
+  <Card title="Metered" icon="gauge">
+    Track quantitative usage with limits
+  </Card>
+  <Card title="Boolean" icon="toggle-on">
+    Simple on/off feature flags
+  </Card>
+  <Card title="Static" icon="hashtag">
+    Fixed quota or allowance
+  </Card>
+</CardGroup>
+
+### Metered Features
+
+Metered features track actual consumption and compare it against configured limits.
+
+```json Metered Feature
+{
+  "id": "feat_api_calls",
+  "name": "API Calls",
+  "lookup_key": "api_calls",
+  "type": "metered",
+  "description": "Number of API requests per month",
+  "meter_id": "meter_api_requests",
+  "unit_singular": "call",
+  "unit_plural": "calls",
+  "alert_settings": {
+    "critical": {
+      "threshold": 90,
+      "enabled": true
+    },
+    "info": {
+      "threshold": 75,
+      "enabled": true
+    }
+  },
+  "metadata": {
+    "category": "usage"
+  }
+}
+```
+
+**Key Characteristics:**
+- Requires `meter_id` to link to usage tracking
+- Supports alert thresholds (e.g., notify at 75% and 90% of limit)
+- Units displayed in UI ("1,000 calls" vs "1,000 API Calls")
+- Usage resets based on billing period
+
+**Use Cases:**
+- API request limits
+- Storage quotas
+- Compute hours
+- Email sends
+- Team member seats (if metered)
+
+### Boolean Features
+
+Simple on/off toggles for capabilities.
+
+```json Boolean Feature
+{
+  "id": "feat_sso",
+  "name": "Single Sign-On",
+  "lookup_key": "sso",
+  "type": "boolean",
+  "description": "SAML/OAuth SSO integration",
+  "metadata": {
+    "category": "security",
+    "enterprise_only": "true"
+  }
+}
+```
+
+**Key Characteristics:**
+- No meter required
+- No quantity tracking
+- Binary access (enabled/disabled)
+
+**Use Cases:**
+- Premium feature access (SSO, advanced analytics)
+- Integrations (Salesforce, Slack)
+- Priority support
+- Custom branding
+
+### Static Features
+
+Fixed allowances that don't track real-time usage.
+
+```json Static Feature
+{
+  "id": "feat_team_size",
+  "name": "Team Members",
+  "lookup_key": "team_members",
+  "type": "static",
+  "description": "Maximum number of team members",
+  "unit_singular": "member",
+  "unit_plural": "members",
+  "metadata": {
+    "category": "capacity"
+  }
+}
+```
+
+**Key Characteristics:**
+- No real-time tracking via meters
+- Fixed quota defined in entitlement
+- Manual enforcement (your application checks the limit)
+
+**Use Cases:**
+- Project limits
+- Workspace counts
+- Maximum team size
+- Template libraries
+
+## Feature Structure
+
+### Core Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the feature (max 50 characters)
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Display name of the feature (max 255 characters)
+</ParamField>
+
+<ParamField path="lookup_key" type="string" required>
+  Unique human-readable identifier for API lookups (max 255 characters)
+</ParamField>
+
+<ParamField path="type" type="enum" required>
+  Feature type: `metered`, `boolean`, or `static`
+</ParamField>
+
+<ParamField path="description" type="text">
+  Detailed description of what the feature provides
+</ParamField>
+
+<ParamField path="meter_id" type="string">
+  ID of the meter tracking this feature's usage (required for `metered` type)
+</ParamField>
+
+<ParamField path="unit_singular" type="string">
+  Singular form of the unit (e.g., "call", "GB", "user")
+</ParamField>
+
+<ParamField path="unit_plural" type="string">
+  Plural form of the unit (e.g., "calls", "GB", "users")
+</ParamField>
+
+<ParamField path="metadata" type="object">
+  Custom key-value pairs for additional feature information
+</ParamField>
+
+### Alert Settings
+
+For metered features, configure usage alerts:
+
+```json Alert Configuration
+{
+  "alert_settings": {
+    "critical": {
+      "threshold": 90,
+      "enabled": true
+    },
+    "info": {
+      "threshold": 75,
+      "enabled": true
+    }
+  }
+}
+```
+
+<ParamField path="alert_settings.critical.threshold" type="integer">
+  Percentage of limit to trigger critical alert (0-100)
+</ParamField>
+
+<ParamField path="alert_settings.critical.enabled" type="boolean">
+  Whether critical alerts are active
+</ParamField>
+
+<ParamField path="alert_settings.info.threshold" type="integer">
+  Percentage of limit to trigger informational alert (0-100)
+</ParamField>
+
+<ParamField path="alert_settings.info.enabled" type="boolean">
+  Whether info alerts are active
+</ParamField>
+
+<Note>
+Alert thresholds trigger notifications when usage reaches the specified percentage. For example, with a 10,000 call limit and 75% threshold, an alert fires at 7,500 calls.
+</Note>
+
+## Features and Entitlements
+
+Features define **what exists**. Entitlements define **who has access** and **how much**.
+
+<Tabs>
+  <Tab title="Feature Definition">
+    ```json
+    {
+      "id": "feat_storage",
+      "name": "Cloud Storage",
+      "lookup_key": "storage",
+      "type": "metered",
+      "meter_id": "meter_storage_gb",
+      "unit_singular": "GB",
+      "unit_plural": "GB"
+    }
+    ```
+    Defines the "Cloud Storage" capability with metered tracking.
+  </Tab>
+
+  <Tab title="Plan Entitlements">
+    Different plans grant different amounts:
+
+    **Starter Plan:**
+    ```json
+    {
+      "feature_id": "feat_storage",
+      "limit": 10,
+      "has_unlimited": false
+    }
+    ```
+    
+    **Professional Plan:**
+    ```json
+    {
+      "feature_id": "feat_storage",
+      "limit": 100,
+      "has_unlimited": false
+    }
+    ```
+    
+    **Enterprise Plan:**
+    ```json
+    {
+      "feature_id": "feat_storage",
+      "limit": null,
+      "has_unlimited": true
+    }
+    ```
+  </Tab>
+
+  <Tab title="Access Check">
+    Your application checks entitlements:
+
+    ```javascript Example Check
+    const entitlement = await flexprice.entitlements.check({
+      customer_id: "cust_123",
+      feature_lookup_key: "storage"
+    });
+
+    if (entitlement.has_access) {
+      if (entitlement.has_unlimited) {
+        // Unlimited storage
+      } else {
+        // Check: current_usage < limit
+        const remaining = entitlement.limit - entitlement.current_usage;
+        console.log(`${remaining} GB remaining`);
+      }
+    } else {
+      // Feature not available on their plan
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Feature Gating Patterns
+
+<AccordionGroup>
+  <Accordion title="Hard Limits (Enforce)">
+    Prevent actions when limit is reached.
+
+    ```javascript
+    const { has_access, current_usage, limit } = await checkEntitlement(
+      customerId, 
+      'api_calls'
+    );
+
+    if (!has_access || (limit && current_usage >= limit)) {
+      throw new Error('API call limit exceeded. Please upgrade your plan.');
+    }
+
+    // Proceed with API call
+    await processRequest();
+    ```
+
+    **When to Use:**
+    - Resource limits (storage, API calls)
+    - Security/compliance constraints
+    - Infrastructure capacity
+  </Accordion>
+
+  <Accordion title="Soft Limits (Warn)">
+    Allow usage but notify the customer.
+
+    ```javascript
+    const { current_usage, limit } = await checkEntitlement(
+      customerId,
+      'team_members'
+    );
+
+    if (limit && current_usage >= limit * 0.9) {
+      await sendNotification({
+        type: 'warning',
+        message: `You're at ${current_usage}/${limit} team members. Consider upgrading.`
+      });
+    }
+
+    // Allow the action
+    await addTeamMember();
+    ```
+
+    **When to Use:**
+    - Encouraging upgrades
+    - Non-critical limits
+    - Grace periods
+  </Accordion>
+
+  <Accordion title="Feature Toggle">
+    Enable/disable functionality based on plan.
+
+    ```javascript
+    const { has_access } = await checkEntitlement(
+      customerId,
+      'advanced_analytics'
+    );
+
+    return {
+      showAnalyticsDashboard: has_access,
+      features: has_access ? ['reports', 'exports', 'custom_charts'] : []
+    };
+    ```
+
+    **When to Use:**
+    - Premium features
+    - Optional integrations
+    - UI customization
+  </Accordion>
+
+  <Accordion title="Tiered Access">
+    Different plans get different levels of the same feature.
+
+    ```javascript
+    const { limit, has_unlimited } = await checkEntitlement(
+      customerId,
+      'projects'
+    );
+
+    let maxProjects;
+    if (has_unlimited) {
+      maxProjects = Infinity;
+    } else {
+      maxProjects = limit || 3; // Default to 3 if not specified
+    }
+
+    if (currentProjectCount >= maxProjects) {
+      return { error: 'Project limit reached', upgradeRequired: true };
+    }
+    ```
+
+    **When to Use:**
+    - Scaling limits across plans
+    - Capacity-based pricing
+    - Freemium models
+  </Accordion>
+</AccordionGroup>
+
+## Alert Workflows
+
+When usage crosses thresholds:
+
+<Steps>
+  <Step title="Usage Tracked">
+    Events flow to the meter linked to the feature:
+    ```json
+    {
+      "customer_id": "cust_123",
+      "event_name": "api.request",
+      "properties": {"endpoint": "/v1/data"}
+    }
+    ```
+  </Step>
+
+  <Step title="Threshold Check">
+    FlexPrice compares current usage to entitlement limit and alert thresholds.
+  </Step>
+
+  <Step title="Alert Generated">
+    When threshold is crossed, an alert event is created:
+    ```json
+    {
+      "type": "feature.usage.threshold",
+      "severity": "info",
+      "feature_id": "feat_api_calls",
+      "customer_id": "cust_123",
+      "current_usage": 7500,
+      "limit": 10000,
+      "threshold_percentage": 75
+    }
+    ```
+  </Step>
+
+  <Step title="Notification Sent">
+    Your application handles the alert (webhook, email, in-app notification).
+  </Step>
+</Steps>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Clear Naming" icon="tag">
+    Use names that match your product UI:
+    - Good: "API Requests", "Team Members", "Storage"
+    - Avoid: "Feature 1", "Limit A", "Quota X"
+  </Card>
+
+  <Card title="Set Meaningful Units" icon="ruler">
+    Define singular and plural forms:
+    ```json
+    {
+      "unit_singular": "project",
+      "unit_plural": "projects"
+    }
+    ```
+    Displays as "1 project" or "5 projects" in UI.
+  </Card>
+
+  <Card title="Use Metadata" icon="database">
+    Categorize and tag features:
+    ```json
+    {
+      "metadata": {
+        "category": "collaboration",
+        "premium": "true",
+        "launched": "2024-01"
+      }
+    }
+    ```
+  </Card>
+
+  <Card title="Configure Alerts Wisely" icon="bell">
+    Set thresholds that give users time to act:
+    - Info: 75% ("heads up")
+    - Critical: 90% ("take action soon")
+    - Consider 95% or 100% for final warnings
+  </Card>
+</CardGroup>
+
+<Warning>
+**Meter Requirement**: Metered features MUST have a valid `meter_id`. The system will reject metered features without a linked meter.
+</Warning>
+
+<Note>
+**Boolean Features**: Don't track usage or require meters. Simply check `has_access` in entitlements.
+</Note>
+
+## Example Scenarios
+
+<CodeGroup>
+```json E-commerce Platform
+{
+  "features": [
+    {
+      "name": "Products",
+      "lookup_key": "products",
+      "type": "static",
+      "unit_singular": "product",
+      "unit_plural": "products"
+    },
+    {
+      "name": "Monthly Orders",
+      "lookup_key": "orders",
+      "type": "metered",
+      "meter_id": "meter_orders",
+      "unit_singular": "order",
+      "unit_plural": "orders",
+      "alert_settings": {
+        "critical": {"threshold": 90, "enabled": true}
+      }
+    },
+    {
+      "name": "Multi-Currency",
+      "lookup_key": "multi_currency",
+      "type": "boolean"
+    }
+  ]
+}
+```
+
+```json SaaS Platform
+{
+  "features": [
+    {
+      "name": "Team Members",
+      "lookup_key": "seats",
+      "type": "static",
+      "unit_singular": "seat",
+      "unit_plural": "seats"
+    },
+    {
+      "name": "API Calls",
+      "lookup_key": "api_calls",
+      "type": "metered",
+      "meter_id": "meter_api",
+      "unit_singular": "call",
+      "unit_plural": "calls",
+      "alert_settings": {
+        "info": {"threshold": 75, "enabled": true},
+        "critical": {"threshold": 90, "enabled": true}
+      }
+    },
+    {
+      "name": "SSO",
+      "lookup_key": "sso",
+      "type": "boolean"
+    },
+    {
+      "name": "Priority Support",
+      "lookup_key": "priority_support",
+      "type": "boolean"
+    }
+  ]
+}
+```
+
+```json Infrastructure Service
+{
+  "features": [
+    {
+      "name": "Compute Hours",
+      "lookup_key": "compute",
+      "type": "metered",
+      "meter_id": "meter_cpu_hours",
+      "unit_singular": "hour",
+      "unit_plural": "hours",
+      "alert_settings": {
+        "info": {"threshold": 80, "enabled": true}
+      }
+    },
+    {
+      "name": "Storage",
+      "lookup_key": "storage",
+      "type": "metered",
+      "meter_id": "meter_storage",
+      "unit_singular": "GB",
+      "unit_plural": "GB"
+    },
+    {
+      "name": "Custom Domains",
+      "lookup_key": "custom_domains",
+      "type": "boolean"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Entitlements" icon="key" href="/core-concepts/entitlements">
+    How features are granted to customers
+  </Card>
+
+  <Card title="Meters" icon="gauge" href="/usage/meters">
+    Track usage for metered features
+  </Card>
+
+  <Card title="Plans" icon="rectangle-list" href="/pricing/plans">
+    Package features into sellable plans
+  </Card>
+
+  <Card title="Events" icon="bolt" href="/usage/events">
+    Send usage data for feature tracking
+  </Card>
+</CardGroup>

@@ -1,122 +1,204 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "FlexPrice",
+  "theme": "sequoia",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#0066CC",
+    "light": "#3399FF",
+    "dark": "#004499"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/flexprice/flexprice"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/flexprice/flexprice"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "architecture"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/tenancy",
+              "concepts/customers",
+              "concepts/metering",
+              "concepts/pricing",
+              "concepts/credits",
+              "concepts/invoicing"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Usage Metering",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "metering/overview",
+              "metering/events",
+              "metering/meters",
+              "metering/aggregations"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Pricing & Plans",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "pricing/plans",
+              "pricing/prices",
+              "pricing/features",
+              "pricing/addons",
+              "pricing/tiers"
+            ]
+          },
+          {
+            "group": "Credits & Wallets",
+            "pages": [
+              "credits/wallets",
+              "credits/grants",
+              "credits/top-ups",
+              "credits/expiration"
+            ]
+          },
+          {
+            "group": "Billing & Invoicing",
+            "pages": [
+              "billing/subscriptions",
+              "billing/invoices",
+              "billing/payments",
+              "billing/credit-notes",
+              "billing/coupons"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/stripe",
+              "integrations/webhooks"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/installation",
+              "self-hosting/configuration",
+              "self-hosting/deployment",
+              "self-hosting/scaling"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "api/overview",
+              "api/authentication",
+              "api/errors",
+              "api/pagination"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Customers",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/customers/create",
+              "api/customers/list",
+              "api/customers/get",
+              "api/customers/update",
+              "api/customers/delete"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events/ingest",
+              "api/events/batch",
+              "api/events/query"
+            ]
+          },
+          {
+            "group": "Meters",
+            "pages": [
+              "api/meters/create",
+              "api/meters/list",
+              "api/meters/get",
+              "api/meters/update"
+            ]
+          },
+          {
+            "group": "Plans",
+            "pages": [
+              "api/plans/create",
+              "api/plans/list",
+              "api/plans/get",
+              "api/plans/update"
+            ]
+          },
+          {
+            "group": "Subscriptions",
+            "pages": [
+              "api/subscriptions/create",
+              "api/subscriptions/list",
+              "api/subscriptions/get",
+              "api/subscriptions/update",
+              "api/subscriptions/cancel"
+            ]
+          },
+          {
+            "group": "Invoices",
+            "pages": [
+              "api/invoices/list",
+              "api/invoices/get",
+              "api/invoices/finalize"
+            ]
+          },
+          {
+            "group": "Wallets & Credits",
+            "pages": [
+              "api/wallets/create",
+              "api/wallets/get",
+              "api/credits/grant",
+              "api/credits/list"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "api/features/create",
+              "api/features/list",
+              "api/features/check-access"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs",
+        "groups": [
+          {
+            "group": "Client Libraries",
+            "pages": [
+              "sdks/overview",
+              "sdks/go",
+              "sdks/python",
+              "sdks/typescript",
+              "sdks/mcp"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

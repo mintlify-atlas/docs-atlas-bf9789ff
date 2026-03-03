@@ -1,0 +1,534 @@
+---
+title: 'Add-ons'
+description: 'Create optional add-ons to extend plan capabilities'
+---
+
+## Overview
+
+Add-ons are optional products that customers can purchase alongside their base plan. They extend plan functionality with additional features, capacity, or services without requiring a plan upgrade.
+
+## Add-on Structure
+
+### Core Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the add-on (max 50 characters)
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Display name of the add-on (max 255 characters)
+</ParamField>
+
+<ParamField path="lookup_key" type="string" required>
+  Unique human-readable identifier for API lookups (max 255 characters)
+</ParamField>
+
+<ParamField path="description" type="text">
+  Detailed description of what the add-on provides
+</ParamField>
+
+<ParamField path="type" type="enum" required>
+  Add-on type:
+  - `onetime`: Can only be purchased once per subscription
+  - `multiple_instance`: Can be purchased multiple times (e.g., additional user packs)
+</ParamField>
+
+<ParamField path="metadata" type="object">
+  Custom key-value pairs (stored as JSONB in PostgreSQL)
+</ParamField>
+
+<ParamField path="status" type="string">
+  Add-on status: `draft` or `published`
+</ParamField>
+
+### Environment Context
+
+Like plans, add-ons are scoped to a tenant and environment:
+
+<ParamField path="tenant_id" type="string" required>
+  Tenant identifier
+</ParamField>
+
+<ParamField path="environment_id" type="string" required>
+  Environment identifier (production, staging, development)
+</ParamField>
+
+```json Example Add-on
+{
+  "id": "addon_extra_storage",
+  "name": "Extra Storage Pack",
+  "lookup_key": "extra_storage_100gb",
+  "description": "Add 100 GB of storage to your plan",
+  "type": "multiple_instance",
+  "tenant_id": "tenant_xyz",
+  "environment_id": "env_prod",
+  "status": "published",
+  "metadata": {
+    "category": "storage",
+    "popular": "true"
+  },
+  "created_at": "2024-02-01T12:00:00Z",
+  "updated_at": "2024-02-01T12:00:00Z"
+}
+```
+
+## Add-on Types
+
+<Tabs>
+  <Tab title="One-Time">
+    Single instance per subscription. Customer can only purchase once.
+
+    ```json One-Time Add-on
+    {
+      "name": "Premium Support",
+      "lookup_key": "premium_support",
+      "type": "onetime",
+      "description": "24/7 priority support with dedicated account manager",
+      "metadata": {
+        "category": "support"
+      }
+    }
+    ```
+
+    **Use Cases:**
+    - Premium support packages
+    - One-time setup services
+    - Exclusive feature access
+    - Custom integrations
+
+    **Behavior:**
+    - Cannot be added twice to the same subscription
+    - Typically toggles a feature or service on
+    - Pricing via single price entity
+  </Tab>
+
+  <Tab title="Multiple Instance">
+    Can be purchased multiple times. Useful for capacity add-ons.
+
+    ```json Multiple Instance Add-on
+    {
+      "name": "User Pack",
+      "lookup_key": "user_pack_5",
+      "type": "multiple_instance",
+      "description": "Add 5 additional user seats",
+      "metadata": {
+        "category": "capacity",
+        "unit_size": "5"
+      }
+    }
+    ```
+
+    **Use Cases:**
+    - Additional user seats (packs of 5, 10, etc.)
+    - Storage bundles (100 GB increments)
+    - Compute resources (CPU/memory blocks)
+    - SMS/email credit packs
+
+    **Behavior:**
+    - Customer can purchase multiple instances
+    - Each instance has its own quantity
+    - Total capacity = sum of all instances
+  </Tab>
+</Tabs>
+
+## Add-on Pricing
+
+Add-ons have their own prices, configured separately from plan prices.
+
+### Pricing an Add-on
+
+Create a price with `entity_type: "ADDON"`:
+
+```json Add-on Price
+{
+  "amount": "10.00",
+  "currency": "usd",
+  "type": "FIXED",
+  "billing_model": "FLAT_FEE",
+  "billing_cadence": "RECURRING",
+  "billing_period": "MONTHLY",
+  "billing_period_count": 1,
+  "entity_type": "ADDON",
+  "entity_id": "addon_extra_storage",
+  "display_name": "Extra Storage (per 100 GB)"
+}
+```
+
+<Note>
+Add-on prices follow the same structure as plan prices. See [Prices](/pricing/prices) for full configuration options.
+</Note>
+
+### Multiple Pricing Options
+
+Offer different billing periods for the same add-on:
+
+<CodeGroup>
+```json Monthly Price
+{
+  "entity_id": "addon_user_pack_5",
+  "entity_type": "ADDON",
+  "amount": "50.00",
+  "currency": "usd",
+  "billing_period": "MONTHLY",
+  "display_name": "5 User Pack - Monthly"
+}
+```
+
+```json Annual Price
+{
+  "entity_id": "addon_user_pack_5",
+  "entity_type": "ADDON",
+  "amount": "500.00",
+  "currency": "usd",
+  "billing_period": "ANNUAL",
+  "display_name": "5 User Pack - Annual (2 months free)"
+}
+```
+</CodeGroup>
+
+## Common Add-on Patterns
+
+<AccordionGroup>
+  <Accordion title="Capacity Add-ons">
+    Increase limits or quotas beyond the base plan.
+
+    ```json Storage Add-on
+    {
+      "name": "Extra Storage - 100 GB",
+      "lookup_key": "storage_100gb",
+      "type": "multiple_instance",
+      "description": "Add 100 GB to your storage quota",
+      "metadata": {
+        "capacity_increase": "100",
+        "unit": "GB"
+      }
+    }
+    ```
+
+    **Pricing:**
+    - $10/month per 100 GB pack
+    - Customer can buy multiple packs
+
+    **Implementation:**
+    - Track instances purchased
+    - Calculate total: base plan storage + (addon instances × 100 GB)
+  </Accordion>
+
+  <Accordion title="Feature Unlock Add-ons">
+    Enable premium features not included in the base plan.
+
+    ```json Advanced Analytics Add-on
+    {
+      "name": "Advanced Analytics",
+      "lookup_key": "advanced_analytics",
+      "type": "onetime",
+      "description": "Unlock custom reports, data exports, and dashboards",
+      "metadata": {
+        "unlocks_features": ["custom_reports", "data_export", "dashboards"]
+      }
+    }
+    ```
+
+    **Pricing:**
+    - $49/month flat fee
+    - One-time purchase
+
+    **Implementation:**
+    - Check entitlements for add-on
+    - Enable features if add-on is active
+  </Accordion>
+
+  <Accordion title="Service Add-ons">
+    Professional services or enhanced support.
+
+    ```json Onboarding Add-on
+    {
+      "name": "Premium Onboarding",
+      "lookup_key": "premium_onboarding",
+      "type": "onetime",
+      "description": "Dedicated onboarding specialist and custom setup",
+      "metadata": {
+        "service_type": "onboarding",
+        "one_time_charge": "true"
+      }
+    }
+    ```
+
+    **Pricing:**
+    - $499 one-time charge
+    - Use `billing_cadence: "ONETIME"`
+
+    ```json One-Time Service Price
+    {
+      "entity_id": "addon_premium_onboarding",
+      "entity_type": "ADDON",
+      "amount": "499.00",
+      "currency": "usd",
+      "type": "FIXED",
+      "billing_cadence": "ONETIME"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Usage Credit Packs">
+    Prepaid bundles of usage credits.
+
+    ```json SMS Credit Pack
+    {
+      "name": "SMS Credit Pack - 10,000",
+      "lookup_key": "sms_credits_10k",
+      "type": "multiple_instance",
+      "description": "10,000 SMS credits",
+      "metadata": {
+        "credit_amount": "10000",
+        "credit_type": "sms"
+      }
+    }
+    ```
+
+    **Pricing:**
+    - $100 per pack (10,000 credits)
+    - One-time purchase, credits roll over
+
+    **Implementation:**
+    - Grant credits to customer wallet
+    - Deduct from wallet as usage occurs
+  </Accordion>
+</AccordionGroup>
+
+## Add-on Lifecycle
+
+<Steps>
+  <Step title="Create Add-on">
+    Define the add-on with name, type, and metadata.
+    ```json
+    {
+      "name": "Priority Support",
+      "lookup_key": "priority_support",
+      "type": "onetime",
+      "status": "draft"
+    }
+    ```
+  </Step>
+
+  <Step title="Configure Pricing">
+    Create one or more prices for the add-on.
+    ```json
+    {
+      "entity_type": "ADDON",
+      "entity_id": "addon_priority_support",
+      "amount": "99.00",
+      "currency": "usd",
+      "billing_period": "MONTHLY"
+    }
+    ```
+  </Step>
+
+  <Step title="Publish">
+    Change status to `published` to make available.
+    ```json
+    {"status": "published"}
+    ```
+  </Step>
+
+  <Step title="Add to Subscription">
+    Customers purchase add-ons when creating or updating subscriptions.
+    ```json
+    {
+      "plan_id": "plan_professional",
+      "addons": [
+        {
+          "addon_id": "addon_priority_support",
+          "price_id": "price_support_monthly",
+          "quantity": 1
+        }
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Manage Instances">
+    For `multiple_instance` add-ons, customers can add more instances.
+    ```json
+    {
+      "addons": [
+        {
+          "addon_id": "addon_user_pack_5",
+          "quantity": 3  // 3 packs = 15 extra users
+        }
+      ]
+    }
+    ```
+  </Step>
+</Steps>
+
+## Add-ons and Entitlements
+
+Add-ons can grant feature entitlements just like plans.
+
+### Example: Storage Add-on
+
+**Base Plan Entitlement:**
+```json
+{
+  "plan_id": "plan_starter",
+  "feature_id": "feat_storage",
+  "limit": 10  // 10 GB base
+}
+```
+
+**Add-on Entitlement:**
+```json
+{
+  "addon_id": "addon_storage_100gb",
+  "feature_id": "feat_storage",
+  "limit": 100  // +100 GB per instance
+}
+```
+
+**Total for Customer:**
+- Base plan: 10 GB
+- 2 instances of storage add-on: 2 × 100 GB = 200 GB
+- **Total: 210 GB**
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Clear Add-on Scope" icon="bullseye">
+    Make it obvious what the add-on provides:
+    - "5 User Pack" (not "User Add-on")
+    - "100 GB Storage" (not "Extra Space")
+    - "Priority Support" (not "Premium Service")
+  </Card>
+
+  <Card title="Match Billing Periods" icon="calendar-check">
+    Offer add-on billing periods that align with plan billing:
+    - If plan is monthly, offer monthly add-on
+    - If plan is annual, offer annual add-on pricing
+    - Avoid mismatched billing cycles
+  </Card>
+
+  <Card title="Use Metadata Wisely" icon="tags">
+    Store business logic in metadata:
+    ```json
+    {
+      "metadata": {
+        "category": "capacity",
+        "increases_limit": "storage",
+        "limit_increase_amount": "100",
+        "recommended_for": "professional"
+      }
+    }
+    ```
+  </Card>
+
+  <Card title="Type Selection" icon="toggle-on">
+    Choose type based on use case:
+    - `onetime`: Features, services, unique capabilities
+    - `multiple_instance`: Capacity, quotas, scalable resources
+  </Card>
+</CardGroup>
+
+<Warning>
+**Unique Lookup Keys**: The `lookup_key` must be unique within your tenant and environment when status is `published`. FlexPrice enforces this with a database constraint.
+</Warning>
+
+<Note>
+Add-ons inherit the subscription's billing period. If a customer switches from monthly to annual billing, add-on charges adjust accordingly.
+</Note>
+
+## Example Configurations
+
+<CodeGroup>
+```json User Seats Add-on
+{
+  "id": "addon_seats_10",
+  "name": "10 Additional Seats",
+  "lookup_key": "seats_10",
+  "type": "multiple_instance",
+  "description": "Add 10 user seats to your workspace",
+  "status": "published",
+  "metadata": {
+    "category": "capacity",
+    "seat_count": "10"
+  },
+  "prices": [
+    {
+      "amount": "100.00",
+      "currency": "usd",
+      "billing_period": "MONTHLY",
+      "entity_type": "ADDON",
+      "entity_id": "addon_seats_10"
+    }
+  ]
+}
+```
+
+```json Premium Feature Add-on
+{
+  "id": "addon_white_label",
+  "name": "White Label Branding",
+  "lookup_key": "white_label",
+  "type": "onetime",
+  "description": "Remove FlexPrice branding and use your own logo",
+  "status": "published",
+  "metadata": {
+    "category": "branding",
+    "enterprise_feature": "true"
+  },
+  "prices": [
+    {
+      "amount": "199.00",
+      "currency": "usd",
+      "billing_period": "MONTHLY",
+      "entity_type": "ADDON",
+      "entity_id": "addon_white_label"
+    }
+  ]
+}
+```
+
+```json Service Add-on
+{
+  "id": "addon_custom_integration",
+  "name": "Custom Integration Setup",
+  "lookup_key": "custom_integration",
+  "type": "onetime",
+  "description": "Professional services to build a custom integration",
+  "status": "published",
+  "metadata": {
+    "category": "services",
+    "estimated_hours": "20"
+  },
+  "prices": [
+    {
+      "amount": "2500.00",
+      "currency": "usd",
+      "billing_cadence": "ONETIME",
+      "entity_type": "ADDON",
+      "entity_id": "addon_custom_integration"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Plans" icon="rectangle-list" href="/pricing/plans">
+    Base plans that add-ons extend
+  </Card>
+
+  <Card title="Prices" icon="dollar-sign" href="/pricing/prices">
+    Configure pricing for add-ons
+  </Card>
+
+  <Card title="Subscriptions" icon="repeat" href="/core-concepts/subscriptions">
+    How add-ons are attached to subscriptions
+  </Card>
+
+  <Card title="Entitlements" icon="key" href="/core-concepts/entitlements">
+    Feature access granted by add-ons
+  </Card>
+</CardGroup>

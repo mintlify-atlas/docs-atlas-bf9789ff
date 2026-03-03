@@ -1,0 +1,270 @@
+---
+title: Billing & invoicing
+description: How FlexPrice generates invoices and processes payments
+---
+
+FlexPrice automatically generates invoices based on subscriptions, usage, and one-time charges, then processes payments through integrated payment providers.
+
+## Invoice Lifecycle
+
+<Steps>
+  <Step title="Draft">
+    Invoice is created with line items but not yet finalized
+  </Step>
+  <Step title="Open">
+    Invoice is finalized and sent to customer for payment
+  </Step>
+  <Step title="Paid">
+    Payment received and applied to invoice
+  </Step>
+  <Step title="Void">
+    Invoice cancelled and marked as invalid
+  </Step>
+</Steps>
+
+## Invoice Structure
+
+An invoice contains:
+
+```json
+{
+  "id": "inv_uuid",
+  "customer_id": "cust_uuid",
+  "status": "OPEN",
+  "invoice_type": "SUBSCRIPTION",
+  "subtotal": 10000,
+  "tax": 800,
+  "total": 10800,
+  "amount_due": 8800,
+  "currency": "USD",
+  "billing_period_start": "2024-03-01T00:00:00Z",
+  "billing_period_end": "2024-03-31T23:59:59Z",
+  "line_items": [
+    {
+      "description": "Professional Plan",
+      "quantity": 1,
+      "unit_amount": 9900,
+      "amount": 9900
+    },
+    {
+      "description": "API Calls (15,234 calls)",
+      "quantity": 15234,
+      "unit_amount": 10,
+      "amount": 15234
+    }
+  ],
+  "discounts": [
+    {
+      "amount": 2000,
+      "description": "Early bird discount"
+    }
+  ],
+  "credit_applied": 2000
+}
+```
+
+<Info>
+All amounts are in the smallest currency unit (cents for USD).
+</Info>
+
+## Invoice Types
+
+<Tabs>
+  <Tab title="Subscription">
+    Generated automatically at billing cycle:
+    
+    - Base subscription fee
+    - Usage charges for the period
+    - Add-on charges
+    - Prorated amounts for changes
+    
+    Created at the end of each billing period.
+  </Tab>
+  
+  <Tab title="One-Time">
+    Manual invoice for custom charges:
+    
+    ```json
+    {
+      "invoice_type": "ONE_TIME",
+      "line_items": [
+        {
+          "description": "Professional Services",
+          "amount": 500000
+        }
+      ]
+    }
+    ```
+    
+    Used for implementation fees, custom work, etc.
+  </Tab>
+  
+  <Tab title="Usage">
+    Pure usage invoice without subscription:
+    
+    ```json
+    {
+      "invoice_type": "USAGE",
+      "line_items": [
+        {
+          "description": "API Calls",
+          "quantity": 50000,
+          "unit_amount": 10
+        }
+      ]
+    }
+    ```
+    
+    For pay-as-you-go customers.
+  </Tab>
+</Tabs>
+
+## Line Items
+
+Each line item represents a charge:
+
+- **Subscription fees** - Fixed recurring charges
+- **Usage charges** - Metered usage from meters
+- **Add-ons** - Optional purchased add-ons
+- **Overage** - Usage beyond included amounts
+- **Proration** - Partial period charges
+
+<Note>
+Line items include detailed usage breakdown when grouped by dimensions (endpoint, region, etc.).
+</Note>
+
+## Amount Calculation
+
+```
+Subtotal = Sum of all line items
+- Discounts (coupons, promotions)
+= Subtotal after discounts
++ Taxes (based on customer location)
+= Total
+- Credits applied (from wallet)
+= Amount Due
+```
+
+<Tip>
+Credits are applied after discounts and taxes, maximizing customer benefit.
+</Tip>
+
+## Billing Cycles
+
+Invoices are generated based on subscription billing cadence:
+
+- **Monthly** - Invoice at end of each month
+- **Quarterly** - Invoice every 3 months
+- **Annual** - Invoice once per year
+- **Custom** - Define your own billing period
+
+### Anniversary vs Calendar
+
+<Tabs>
+  <Tab title="Anniversary">
+    Bill based on subscription start date:
+    
+    - Started March 15 → Bill on 15th of each month
+    - Consistent with customer's signup date
+    - Proration on first invoice if mid-month
+  </Tab>
+  
+  <Tab title="Calendar">
+    Bill at end of calendar month:
+    
+    - All customers billed on same day
+    - Easier batch processing
+    - First invoice always prorated
+  </Tab>
+</Tabs>
+
+## Payment Processing
+
+Once invoice is finalized:
+
+<Steps>
+  <Step title="Invoice finalized">
+    Invoice status changes from DRAFT to OPEN
+  </Step>
+  <Step title="Payment attempted">
+    Charge customer via configured payment method
+  </Step>
+  <Step title="Payment recorded">
+    Successful payment updates invoice to PAID status
+  </Step>
+  <Step title="Receipt sent">
+    Customer receives payment confirmation
+  </Step>
+</Steps>
+
+<Warning>
+Failed payments trigger retry logic and can result in subscription suspension.
+</Warning>
+
+## Integration with Payment Providers
+
+FlexPrice syncs invoices with:
+
+- **Stripe** - Create/update Stripe invoices
+- **Chargebee** - Sync to Chargebee subscription
+- **Razorpay** - Generate payment links
+- **Custom** - Webhook events for custom systems
+
+```json
+{
+  "integration_entity_mapping": {
+    "provider": "stripe",
+    "external_id": "in_1234567890"
+  }
+}
+```
+
+<Info>
+External invoice IDs are stored for reconciliation and two-way sync.
+</Info>
+
+## Credit Notes
+
+Issue refunds or adjustments:
+
+```json
+{
+  "invoice_id": "inv_uuid",
+  "amount": 5000,
+  "type": "REFUND",
+  "reason": "Billing error"
+}
+```
+
+Credit notes reduce the invoice amount and can trigger payment refunds.
+
+## Proration
+
+When subscriptions change mid-period:
+
+1. Calculate unused time on old plan
+2. Calculate used time on new plan
+3. Credit for unused portion
+4. Charge for new portion
+5. Net amount added to next invoice
+
+<Note>
+Proration ensures fair billing when customers upgrade, downgrade, or cancel.
+</Note>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Subscriptions" href="/billing/subscriptions" icon="repeat">
+    Subscription lifecycle and billing
+  </Card>
+  <Card title="Invoices Guide" href="/billing/invoices" icon="file-invoice">
+    Detailed invoice management
+  </Card>
+  <Card title="List Invoices API" href="/api/invoices/list" icon="code">
+    API reference for invoices
+  </Card>
+  <Card title="Payments" href="/billing/payments" icon="credit-card">
+    Payment processing and methods
+  </Card>
+</CardGroup>

@@ -1,0 +1,136 @@
+---
+title: Introduction to FlexPrice
+description: Monetization infrastructure built for AI-native companies
+---
+
+<img
+  src="https://raw.githubusercontent.com/flexprice/flexprice/main/assets/logo.png"
+  alt="FlexPrice Logo"
+  height="200"
+/>
+
+## Monetization Infrastructure Built for AI Native Companies
+
+FlexPrice lets AI-native and SaaS teams operate usage-based, credit-based, and hybrid pricing with real-time metering and reporting that scales as your product evolves.
+
+## Why FlexPrice?
+
+Modern app developers often find themselves wrestling with billing systems. Traditional billing services handle simple subscriptions or payments, but anything beyond that – usage metering, credit systems, feature gating, custom invoice logic – usually isn't supported out of the box.
+
+<CardGroup cols={2}>
+  <Card title="Developer-First Design" icon="code">
+    Built API-first with easy integrations. Simply send usage events via SDKs, and FlexPrice handles the aggregation, metering, and billing logic in real time.
+  </Card>
+  <Card title="Open Source & Self-Hostable" icon="github">
+    Run on your own infrastructure for full transparency and control. No black-box dependency, no surprise fees, and you're free from vendor lock-in.
+  </Card>
+  <Card title="Composable Architecture" icon="puzzle-piece">
+    Integrates with your existing billing providers like Stripe or Chargebee. Build on top of your current stack rather than replacing it.
+  </Card>
+  <Card title="Flexible Pricing Models" icon="dollar-sign">
+    Support usage-based billing, tiered plans, seat-based subscriptions, prepaid credits, free tiers with overage, or any hybrid model out-of-the-box.
+  </Card>
+</CardGroup>
+
+## Core Features
+
+<CardGroup cols={2}>
+  <Card title="Usage Metering" icon="gauge" href="/api-reference/events/get-raw-events">
+    Track custom usage events at granular level in real time. Handle millions of events with reliable aggregation, even at peak load.
+  </Card>
+  <Card title="Credit Grants" icon="wallet" href="/docs/Wallet/Creating%20a%20wallet">
+    Support prepaid and promotional credits with full control. Set up automatic top-ups, credit expiration, and wallet management.
+  </Card>
+  <Card title="Pricing Plans" icon="tag" href="/docs/Product%20catalogue/Plans/Overview">
+    Design and iterate on pricing models with total flexibility. Launch new plans or modify existing ones without engineering effort.
+  </Card>
+  <Card title="Feature Management" icon="toggle-on" href="/docs/Product%20catalogue/Features/Overview">
+    Manage feature entitlements and usage limits per plan or per customer. Define toggles, metered limits, or configuration values.
+  </Card>
+  <Card title="Subscriptions & Invoicing" icon="file-invoice" href="/docs/Invoices/Overview">
+    Generate accurate invoices based on real-time usage data. Automate billing cycles with proration, overages, and credit application.
+  </Card>
+  <Card title="Real-Time Analytics" icon="chart-line">
+    Get clear visibility into usage and charges. Real-time usage summaries and cost reports for both engineering and finance teams.
+  </Card>
+</CardGroup>
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get FlexPrice running locally with Docker Compose and ingest your first usage event in under 5 minutes.
+  </Card>
+  <Card title="Architecture Overview" icon="diagram-project" href="/architecture">
+    Understand FlexPrice's system architecture, technology stack, and how components work together.
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Explore the complete API documentation with examples for all endpoints.
+  </Card>
+  <Card title="SDKs" icon="code-branch">
+    Use official SDKs for Go, Python, and JavaScript to integrate FlexPrice into your application.
+  </Card>
+</CardGroup>
+
+## Open Architecture
+
+Your application, whether it's running backend APIs, AI agents, or custom workflows, can send usage data to FlexPrice. You can directly stream data from data warehouses or analytics pipelines as well.
+
+<Steps>
+  <Step title="Ingest Usage Data">
+    Your application sends usage events to FlexPrice via SDKs or HTTP APIs. Stream from data warehouses or analytics pipelines directly.
+  </Step>
+  <Step title="Process & Calculate">
+    FlexPrice processes data in real time. Calculate pricing based on customer plans, apply prepaid/promotional credits, enforce feature limits, and generate invoices automatically.
+  </Step>
+  <Step title="Sync to Your Tools">
+    Connect to existing tools for payments, CPQ, CRM, and accounting. Sync invoices to payment processors, update customer data in CRM, and push revenue to accounting tools.
+  </Step>
+</Steps>
+
+## Why Billing is a Developer Problem
+
+<Note>
+  When existing billing tools don't flex to your product's needs, developers shoulder the burden – eating up valuable development time and causing ongoing maintenance headaches.
+</Note>
+
+Modern developers face several critical challenges:
+
+- **Rigid billing tools**: Traditional systems handle simple subscriptions but struggle with usage metering, credit systems, and custom invoice logic
+- **Complex usage metering at scale**: Accurate tracking involves capturing high-volume events, real-time aggregation, and handling edge cases reliably
+- **Vendor lock-in**: Third-party platforms are often closed systems with percentage fees on revenue, frustrating engineers who want control
+- **Delayed monetization**: Every week spent building billing is a week not spent on core features, delaying revenue and business agility
+
+## Community & Resources
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="https://docs.flexprice.io">
+    Complete guides and API reference
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/flexprice/flexprice">
+    Open source repository
+  </Card>
+  <Card title="Demo" icon="video" href="https://www.loom.com/share/60d8308781254fe0bc5be341501f9fd5">
+    Watch FlexPrice in action
+  </Card>
+  <Card title="Slack Community" icon="slack" href="https://flexpricecommunity.slack.com">
+    Join the community
+  </Card>
+  <Card title="LinkedIn" icon="linkedin" href="https://www.linkedin.com/company/flexpriceio">
+    Follow us on LinkedIn
+  </Card>
+  <Card title="Twitter" icon="twitter" href="https://x.com/tryflexprice">
+    Follow us on X
+  </Card>
+</CardGroup>
+
+## License
+
+FlexPrice is a commercial open source company with an "Open Core" model:
+
+- **Core technology (99%)**: Fully open source, licensed under [AGPLv3](https://opensource.org/license/agpl-v3)
+- **Enterprise Edition (1%)**: Covered under a commercial license
+
+<Tip>
+  We work closely with the community and always invite feedback about what should be open and what is fine to be commercial. Open a [discussion](https://github.com/flexprice/flexprice/discussions) if you have thoughts on this.
+</Tip>

@@ -1,0 +1,620 @@
+---
+title: 'Discount Coupons'
+description: 'Create and manage discount coupons for subscriptions and invoices in FlexPrice'
+---
+
+## Overview
+
+Coupons in FlexPrice provide flexible discount mechanisms for subscriptions and invoices. They support fixed amount and percentage discounts, time-limited redemption periods, usage limits, and rule-based application logic.
+
+## Coupon Structure
+
+```json
+{
+  "id": "coupon_spring2024",
+  "name": "Spring 2024 Promotion",
+  "type": "percentage",
+  "percentage_off": "25.0000",
+  "amount_off": "0.00",
+  "currency": null,
+  "cadence": "repeated",
+  "duration_in_periods": 3,
+  "redeem_after": "2024-03-01T00:00:00Z",
+  "redeem_before": "2024-04-01T00:00:00Z",
+  "max_redemptions": 100,
+  "total_redemptions": 23,
+  "rules": {
+    "apply_to": "invoice",
+    "conditions": [
+      {
+        "field": "plan_id",
+        "operator": "in",
+        "value": ["plan_premium", "plan_enterprise"]
+      }
+    ]
+  },
+  "metadata": {
+    "campaign": "spring_promo_2024",
+    "target_segment": "new_customers"
+  }
+}
+```
+
+## Coupon Types
+
+FlexPrice supports two primary discount types:
+
+<Tabs>
+  <Tab title="Fixed Amount">
+    Reduces the total by a specific currency amount.
+    
+    ```json
+    {
+      "type": "fixed",
+      "amount_off": "50.00",
+      "currency": "usd",
+      "percentage_off": "0.00"
+    }
+    ```
+    
+    Example: $50 off any subscription
+  </Tab>
+  
+  <Tab title="Percentage">
+    Reduces the total by a percentage.
+    
+    ```json
+    {
+      "type": "percentage",
+      "percentage_off": "25.0000",
+      "amount_off": "0.00",
+      "currency": null
+    }
+    ```
+    
+    Example: 25% off the subscription price
+  </Tab>
+</Tabs>
+
+<Warning>
+For fixed amount coupons, the `currency` field is required and must match the subscription/invoice currency. Percentage coupons don't require a currency.
+</Warning>
+
+## Coupon Cadence
+
+Cadence determines how long the discount applies:
+
+<Tabs>
+  <Tab title="Once">
+    Discount applies only to the first invoice/period.
+    
+    ```json
+    {
+      "cadence": "once",
+      "duration_in_periods": null
+    }
+    ```
+    
+    Use for: Welcome discounts, trial conversions
+  </Tab>
+  
+  <Tab title="Repeated">
+    Discount applies for a specific number of billing periods.
+    
+    ```json
+    {
+      "cadence": "repeated",
+      "duration_in_periods": 3
+    }
+    ```
+    
+    Use for: Limited-time promotions (e.g., "3 months at 50% off")
+  </Tab>
+  
+  <Tab title="Forever">
+    Discount applies for the lifetime of the subscription.
+    
+    ```json
+    {
+      "cadence": "forever",
+      "duration_in_periods": null
+    }
+    ```
+    
+    Use for: Permanent discounts, special partnership rates
+  </Tab>
+</Tabs>
+
+## Redemption Period
+
+Control when coupons can be redeemed:
+
+```json
+{
+  "redeem_after": "2024-03-01T00:00:00Z",
+  "redeem_before": "2024-04-01T00:00:00Z"
+}
+```
+
+- **redeem_after**: Coupon cannot be used before this date
+- **redeem_before**: Coupon cannot be used after this date
+
+<Steps>
+  <Step title="Before redeem_after">
+    Coupon is not yet valid. Redemption attempts will fail.
+  </Step>
+  
+  <Step title="Between dates">
+    Coupon is active and can be redeemed.
+  </Step>
+  
+  <Step title="After redeem_before">
+    Coupon has expired. No new redemptions allowed.
+  </Step>
+</Steps>
+
+## Usage Limits
+
+Limit how many times a coupon can be used:
+
+```json
+{
+  "max_redemptions": 100,
+  "total_redemptions": 23
+}
+```
+
+- **max_redemptions**: Maximum number of times the coupon can be used
+- **total_redemptions**: Current redemption count
+
+When `total_redemptions >= max_redemptions`, the coupon cannot be used anymore.
+
+### Unlimited Redemptions
+
+```json
+{
+  "max_redemptions": null,
+  "total_redemptions": 150
+}
+```
+
+Set `max_redemptions` to `null` for unlimited usage.
+
+## Rule-Based Discounts
+
+Coupons support complex rule engines for conditional application:
+
+```json
+{
+  "rules": {
+    "apply_to": "invoice",
+    "conditions": [
+      {
+        "field": "plan_id",
+        "operator": "in",
+        "value": ["plan_premium", "plan_enterprise"]
+      },
+      {
+        "field": "subtotal",
+        "operator": "gte",
+        "value": 1000
+      }
+    ],
+    "logic": "all"
+  }
+}
+```
+
+Rule components:
+- **apply_to**: Target entity (`invoice`, `subscription`, `line_item`)
+- **conditions**: Array of conditions that must be met
+- **logic**: `all` (AND) or `any` (OR) for multiple conditions
+
+### Common Rule Examples
+
+<Tabs>
+  <Tab title="Plan-Specific">
+    Only apply to specific plans:
+    
+    ```json
+    {
+      "conditions": [
+        {
+          "field": "plan_id",
+          "operator": "in",
+          "value": ["plan_premium"]
+        }
+      ]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Minimum Amount">
+    Require minimum purchase amount:
+    
+    ```json
+    {
+      "conditions": [
+        {
+          "field": "subtotal",
+          "operator": "gte",
+          "value": 500
+        }
+      ]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="New Customers">
+    Only for first-time customers:
+    
+    ```json
+    {
+      "conditions": [
+        {
+          "field": "customer.invoice_count",
+          "operator": "eq",
+          "value": 0
+        }
+      ]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Combined Rules">
+    Multiple conditions with AND logic:
+    
+    ```json
+    {
+      "conditions": [
+        {
+          "field": "plan_id",
+          "operator": "in",
+          "value": ["plan_premium"]
+        },
+        {
+          "field": "subtotal",
+          "operator": "gte",
+          "value": 1000
+        }
+      ],
+      "logic": "all"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Coupon Associations
+
+When a coupon is applied to a subscription, a coupon association is created:
+
+```json
+{
+  "id": "ca_abc123",
+  "coupon_id": "coupon_spring2024",
+  "subscription_id": "sub_premium",
+  "customer_id": "cus_xyz789",
+  "applied_at": "2024-03-15T10:00:00Z",
+  "expires_at": "2024-06-15T00:00:00Z",
+  "periods_remaining": 2,
+  "metadata": {
+    "applied_by": "sales_rep_jane"
+  }
+}
+```
+
+Associations track:
+- Which coupons are attached to which subscriptions
+- When the coupon was applied
+- When it expires (for repeated cadence)
+- How many periods remain
+
+## Coupon Applications
+
+Each time a coupon discount is applied to an invoice, a coupon application is created:
+
+```json
+{
+  "id": "capp_xyz",
+  "coupon_id": "coupon_spring2024",
+  "subscription_id": "sub_premium",
+  "invoice_id": "inv_abc123",
+  "customer_id": "cus_xyz789",
+  "discount_amount": "250.00",
+  "currency": "usd",
+  "applied_at": "2024-03-15T10:00:00Z",
+  "metadata": {
+    "billing_period": "2024-03"
+  }
+}
+```
+
+Applications provide:
+- Audit trail of discount usage
+- Discount amounts per invoice
+- Reporting and analytics data
+
+## Coupon Lifecycle Example
+
+<Steps>
+  <Step title="Create Coupon">
+    ```json
+    {
+      "name": "New Customer 50% Off",
+      "type": "percentage",
+      "percentage_off": "50.0000",
+      "cadence": "repeated",
+      "duration_in_periods": 3,
+      "max_redemptions": 50
+    }
+    ```
+  </Step>
+  
+  <Step title="Associate with Subscription">
+    When customer redeems the coupon:
+    ```json
+    {
+      "subscription_id": "sub_new_customer",
+      "coupon_id": "coupon_50off"
+    }
+    ```
+  </Step>
+  
+  <Step title="First Invoice">
+    Discount applied to first invoice:
+    ```json
+    {
+      "invoice": {
+        "subtotal": "1000.00",
+        "total_discount": "500.00",
+        "total": "500.00"
+      },
+      "coupon_applications": [
+        {
+          "coupon_id": "coupon_50off",
+          "discount_amount": "500.00"
+        }
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Subsequent Invoices">
+    Discount continues for 2 more periods, then expires.
+  </Step>
+</Steps>
+
+## Multiple Coupons
+
+Subscriptions can have multiple coupons applied:
+
+```json
+{
+  "subscription": {
+    "coupon_associations": [
+      {
+        "coupon_id": "coupon_seasonal",
+        "periods_remaining": 2
+      },
+      {
+        "coupon_id": "coupon_loyalty",
+        "periods_remaining": null
+      }
+    ]
+  },
+  "invoice": {
+    "subtotal": "1000.00",
+    "total_discount": "350.00",
+    "coupon_applications": [
+      {
+        "coupon_id": "coupon_seasonal",
+        "discount_amount": "250.00"
+      },
+      {
+        "coupon_id": "coupon_loyalty",
+        "discount_amount": "100.00"
+      }
+    ]
+  }
+}
+```
+
+Stacking rules:
+- Multiple coupons apply sequentially
+- Percentage discounts typically apply to subtotal
+- Fixed amount discounts reduce the remaining balance
+- Total discount is sum of all applications
+
+## Coupon Expiration
+
+### Time-Based Expiration
+
+```json
+{
+  "redeem_before": "2024-04-01T00:00:00Z"
+}
+```
+
+Coupon becomes invalid after this date.
+
+### Usage-Based Expiration
+
+```json
+{
+  "max_redemptions": 100,
+  "total_redemptions": 100
+}
+```
+
+Coupon becomes invalid after reaching max redemptions.
+
+### Period-Based Expiration
+
+```json
+{
+  "coupon_association": {
+    "periods_remaining": 0
+  }
+}
+```
+
+For repeated cadence coupons, expires after specified periods.
+
+## Metadata
+
+Store campaign and tracking information:
+
+```json
+{
+  "metadata": {
+    "campaign_name": "Spring Sale 2024",
+    "campaign_id": "CAMP-2024-Q1-001",
+    "target_segment": "new_customers",
+    "channel": "email",
+    "attribution": "newsletter_march_2024",
+    "created_by": "marketing@company.com",
+    "budget_code": "MKT-DISC-Q1-2024"
+  }
+}
+```
+
+Useful for:
+- Campaign tracking and ROI
+- Attribution analysis
+- Budget allocation
+- A/B testing
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Redemption Limits">
+    Always set redemption limits for publicly shared coupons:
+    
+    ```json
+    {
+      "max_redemptions": 100
+    }
+    ```
+    
+    Prevents abuse and controls discount costs.
+  </Tab>
+  
+  <Tab title="Time Bounds">
+    Use time-limited coupons for promotions:
+    
+    ```json
+    {
+      "redeem_before": "2024-04-01T00:00:00Z"
+    }
+    ```
+    
+    Creates urgency and controls promotion duration.
+  </Tab>
+  
+  <Tab title="Plan Restrictions">
+    Target specific plans with rules:
+    
+    ```json
+    {
+      "rules": {
+        "conditions": [
+          {
+            "field": "plan_id",
+            "operator": "in",
+            "value": ["plan_premium"]
+          }
+        ]
+      }
+    }
+    ```
+    
+    Ensures discounts apply only where intended.
+  </Tab>
+  
+  <Tab title="Tracking">
+    Use metadata extensively:
+    
+    ```json
+    {
+      "metadata": {
+        "campaign": "spring_2024",
+        "channel": "email",
+        "segment": "trial_users"
+      }
+    }
+    ```
+    
+    Enables detailed analytics and reporting.
+  </Tab>
+</Tabs>
+
+## Common Patterns
+
+### Welcome Discount
+
+```json
+{
+  "name": "Welcome: 50% Off First Month",
+  "type": "percentage",
+  "percentage_off": "50.0000",
+  "cadence": "once"
+}
+```
+
+### Extended Trial
+
+```json
+{
+  "name": "3 Months at 75% Off",
+  "type": "percentage",
+  "percentage_off": "75.0000",
+  "cadence": "repeated",
+  "duration_in_periods": 3
+}
+```
+
+### Loyalty Discount
+
+```json
+{
+  "name": "Loyal Customer: $100/month Forever",
+  "type": "fixed",
+  "amount_off": "100.00",
+  "currency": "usd",
+  "cadence": "forever"
+}
+```
+
+### Flash Sale
+
+```json
+{
+  "name": "24-Hour Flash: 40% Off",
+  "type": "percentage",
+  "percentage_off": "40.0000",
+  "cadence": "once",
+  "redeem_after": "2024-03-15T00:00:00Z",
+  "redeem_before": "2024-03-16T00:00:00Z",
+  "max_redemptions": 50
+}
+```
+
+### Minimum Purchase
+
+```json
+{
+  "name": "$50 Off Orders Over $500",
+  "type": "fixed",
+  "amount_off": "50.00",
+  "currency": "usd",
+  "rules": {
+    "conditions": [
+      {
+        "field": "subtotal",
+        "operator": "gte",
+        "value": 500
+      }
+    ]
+  }
+}
+```

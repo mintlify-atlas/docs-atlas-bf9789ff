@@ -1,0 +1,317 @@
+---
+title: 'Plans'
+description: 'Define and manage pricing plans for your products'
+---
+
+## Overview
+
+Plans are the foundational building blocks of your pricing structure in FlexPrice. Each plan represents a pricing model that can be assigned to customers through subscriptions. Plans contain prices, features, and metadata that define what customers receive and how they're charged.
+
+## Plan Structure
+
+### Core Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the plan (max 50 characters)
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Display name of the plan (max 255 characters)
+</ParamField>
+
+<ParamField path="lookup_key" type="string">
+  Human-readable identifier for API lookups (max 255 characters). Must be unique within tenant and environment.
+</ParamField>
+
+<ParamField path="description" type="text">
+  Detailed description of what the plan includes
+</ParamField>
+
+<ParamField path="display_order" type="integer" default="0">
+  Order in which plans should be displayed in UI (lower numbers appear first)
+</ParamField>
+
+<ParamField path="metadata" type="object">
+  Custom key-value pairs for storing additional plan information
+</ParamField>
+
+<ParamField path="status" type="string">
+  Plan status: `draft` or `published`. Only published plans can be used in subscriptions.
+</ParamField>
+
+### Environment Scoping
+
+All plans are scoped to a specific tenant and environment, allowing you to:
+- Test pricing changes in development/staging before production
+- Maintain different pricing across multiple products or regions
+- Keep customer data isolated
+
+```json Example Plan
+{
+  "id": "plan_abc123",
+  "name": "Professional Plan",
+  "lookup_key": "professional",
+  "description": "Full-featured plan for growing teams",
+  "display_order": 2,
+  "environment_id": "env_prod",
+  "tenant_id": "tenant_xyz",
+  "status": "published",
+  "metadata": {
+    "category": "business",
+    "recommended": "true"
+  },
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Plan Types
+
+Plans can be structured in various ways depending on your business model:
+
+<Tabs>
+  <Tab title="Seat-Based">
+    Plans that charge based on the number of users or seats.
+
+    ```json Seat-Based Plan
+    {
+      "name": "Team Plan",
+      "lookup_key": "team",
+      "description": "$50 per user per month",
+      "prices": [
+        {
+          "type": "FIXED",
+          "billing_model": "FLAT_FEE",
+          "billing_cadence": "RECURRING",
+          "billing_period": "MONTHLY",
+          "billing_period_count": 1,
+          "amount": "50.00",
+          "currency": "usd"
+        }
+      ]
+    }
+    ```
+
+    **Key Characteristics:**
+    - Price type: `FIXED`
+    - Billing model: `FLAT_FEE`
+    - Quantity represents number of seats
+    - Common in SaaS applications
+  </Tab>
+
+  <Tab title="Usage-Based">
+    Plans that charge based on actual consumption or usage.
+
+    ```json Usage-Based Plan
+    {
+      "name": "Pay As You Go",
+      "lookup_key": "payg",
+      "description": "$0.10 per API call",
+      "prices": [
+        {
+          "type": "USAGE",
+          "billing_model": "FLAT_FEE",
+          "billing_cadence": "RECURRING",
+          "billing_period": "MONTHLY",
+          "billing_period_count": 1,
+          "amount": "0.10",
+          "currency": "usd",
+          "meter_id": "meter_api_calls"
+        }
+      ]
+    }
+    ```
+
+    **Key Characteristics:**
+    - Price type: `USAGE`
+    - Linked to a meter via `meter_id`
+    - Charges calculated from tracked events
+    - Ideal for APIs, cloud resources, or consumption-based services
+  </Tab>
+
+  <Tab title="Hybrid">
+    Plans combining fixed fees with usage-based components.
+
+    ```json Hybrid Plan
+    {
+      "name": "Starter Plan",
+      "lookup_key": "starter",
+      "description": "$29/month + usage fees",
+      "prices": [
+        {
+          "display_name": "Base Fee",
+          "type": "FIXED",
+          "billing_model": "FLAT_FEE",
+          "billing_cadence": "RECURRING",
+          "billing_period": "MONTHLY",
+          "billing_period_count": 1,
+          "amount": "29.00",
+          "currency": "usd"
+        },
+        {
+          "display_name": "API Calls",
+          "type": "USAGE",
+          "billing_model": "TIERED",
+          "billing_cadence": "RECURRING",
+          "billing_period": "MONTHLY",
+          "billing_period_count": 1,
+          "currency": "usd",
+          "meter_id": "meter_api_calls",
+          "tier_mode": "SLAB",
+          "tiers": [
+            {
+              "up_to": 1000,
+              "unit_amount": "0.00"
+            },
+            {
+              "up_to": 10000,
+              "unit_amount": "0.05"
+            },
+            {
+              "up_to": null,
+              "unit_amount": "0.02"
+            }
+          ]
+        }
+      ]
+    }
+    ```
+
+    **Key Characteristics:**
+    - Multiple prices on same plan
+    - Combines predictable base revenue with usage flexibility
+    - First 1,000 API calls included, then tiered pricing
+  </Tab>
+</Tabs>
+
+## Working with Plans
+
+### Creating Plans
+
+When creating a plan, consider:
+
+<AccordionGroup>
+  <Accordion title="Choose a clear naming convention">
+    Use names that clearly communicate value:
+    - Good: "Professional", "Enterprise", "Pay As You Go"
+    - Avoid: "Plan A", "Option 2", "Package X"
+
+    Set `lookup_key` for programmatic access:
+    ```json
+    {
+      "name": "Professional Plan",
+      "lookup_key": "professional"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Set display order for UI presentation">
+    Control how plans appear in your pricing page:
+    ```json
+    [
+      {"name": "Starter", "display_order": 1},
+      {"name": "Professional", "display_order": 2},
+      {"name": "Enterprise", "display_order": 3}
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Use metadata for custom attributes">
+    Store additional business logic in metadata:
+    ```json
+    {
+      "metadata": {
+        "tier": "premium",
+        "support_level": "priority",
+        "onboarding_included": "true",
+        "contract_required": "false"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Start as draft, publish when ready">
+    Plans start in `draft` status:
+    - Test configuration without affecting customers
+    - Validate prices and features
+    - Publish only when ready for production use
+
+    ```json
+    {
+      "status": "draft"  // Change to "published" when ready
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Plan Lifecycle
+
+<Steps>
+  <Step title="Create as Draft">
+    New plans are created with `status: "draft"`. They're not available for subscriptions yet.
+  </Step>
+  
+  <Step title="Configure Prices">
+    Add one or more prices to the plan. Plans can have multiple prices with different billing periods.
+  </Step>
+  
+  <Step title="Associate Features">
+    Link features to define what capabilities the plan includes (optional).
+  </Step>
+  
+  <Step title="Publish">
+    Change status to `published` to make the plan available for subscriptions.
+  </Step>
+  
+  <Step title="Archive (Future)">
+    Plans with active subscriptions cannot be deleted but can be hidden from new purchases.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Note>
+**Unique Lookup Keys**: The `lookup_key` must be unique within your tenant and environment when status is `published`. Use descriptive keys like `starter`, `professional`, or `enterprise`.
+</Note>
+
+<Warning>
+**Don't Delete Active Plans**: If a plan has active subscriptions, removing it can break customer billing. Instead, mark it as unavailable for new sign-ups using metadata.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Keep it Simple" icon="lightbulb">
+    Start with 2-3 clear plan tiers. You can add complexity later based on customer needs.
+  </Card>
+  
+  <Card title="Consistent Billing Periods" icon="calendar">
+    Offer each plan in monthly and annual variants rather than mixing billing periods within a single plan.
+  </Card>
+  
+  <Card title="Test in Staging" icon="flask">
+    Use separate environments to test pricing changes before affecting production customers.
+  </Card>
+  
+  <Card title="Version with Metadata" icon="tag">
+    Use metadata to track plan versions: `{"version": "2.0", "deprecated": "false"}`
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Prices" icon="dollar-sign" href="/pricing/prices">
+    Configure pricing details for your plans
+  </Card>
+  
+  <Card title="Features" icon="star" href="/pricing/features">
+    Define feature access and limits per plan
+  </Card>
+  
+  <Card title="Add-ons" icon="puzzle-piece" href="/pricing/addons">
+    Create optional add-ons for your plans
+  </Card>
+  
+  <Card title="Subscriptions" icon="repeat" href="/core-concepts/subscriptions">
+    Learn how plans are assigned to customers
+  </Card>
+</CardGroup>

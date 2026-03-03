@@ -1,0 +1,529 @@
+---
+title: 'Payment Processing'
+description: 'Handle payment transactions, methods, and retry logic in FlexPrice'
+---
+
+## Overview
+
+Payments in FlexPrice represent monetary transactions that settle invoices or other billing obligations. The system supports multiple payment methods, automatic retries, and integration with various payment gateways.
+
+## Payment Structure
+
+A payment contains comprehensive transaction information:
+
+```json
+{
+  "id": "pay_abc123",
+  "idempotency_key": "inv_xyz_payment_1",
+  "destination_type": "invoice",
+  "destination_id": "inv_xyz789",
+  "payment_method_type": "card",
+  "payment_method_id": "pm_card_123",
+  "payment_gateway": "stripe",
+  "gateway_payment_id": "pi_stripe_xyz",
+  "gateway_tracking_id": "ch_stripe_abc",
+  "amount": "930.00",
+  "currency": "usd",
+  "payment_status": "succeeded",
+  "track_attempts": true,
+  "succeeded_at": "2024-03-05T14:30:00Z",
+  "metadata": {
+    "ip_address": "192.168.1.1",
+    "user_agent": "Mozilla/5.0..."
+  }
+}
+```
+
+## Payment Destinations
+
+Payments can be applied to different entity types:
+
+<Tabs>
+  <Tab title="Invoice">
+    Most common: payment settles a specific invoice.
+    
+    ```json
+    {
+      "destination_type": "invoice",
+      "destination_id": "inv_xyz789"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Subscription">
+    Payment toward a subscription's outstanding balance.
+    
+    ```json
+    {
+      "destination_type": "subscription",
+      "destination_id": "sub_premium"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Customer">
+    General payment to customer account (applied to outstanding invoices).
+    
+    ```json
+    {
+      "destination_type": "customer",
+      "destination_id": "cus_xyz789"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Payment Methods
+
+FlexPrice supports various payment method types:
+
+### Card Payments
+
+```json
+{
+  "payment_method_type": "card",
+  "payment_method_id": "pm_card_123",
+  "payment_gateway": "stripe"
+}
+```
+
+Card payments are processed through integrated payment gateways (Stripe, Razorpay, etc.).
+
+### Bank Transfer
+
+```json
+{
+  "payment_method_type": "bank_transfer",
+  "payment_method_id": "pm_bank_456",
+  "payment_gateway": "stripe"
+}
+```
+
+ACH, SEPA, and other bank transfer methods.
+
+### Payment Links
+
+```json
+{
+  "payment_method_type": "payment_link",
+  "payment_method_id": "",
+  "payment_gateway": "stripe",
+  "gateway_metadata": {
+    "payment_link_url": "https://pay.stripe.com/xyz"
+  }
+}
+```
+
+Generated links for customer self-service payment.
+
+<Warning>
+For payment links, `payment_method_id` should be empty as the customer selects their method through the link interface.
+</Warning>
+
+### Offline Payments
+
+```json
+{
+  "payment_method_type": "offline",
+  "payment_method_id": "",
+  "recorded_at": "2024-03-05T14:30:00Z",
+  "metadata": {
+    "check_number": "CHK-12345",
+    "bank_reference": "REF-789"
+  }
+}
+```
+
+Manually recorded payments (checks, wire transfers, cash).
+
+## Payment Status
+
+Payments progress through several states:
+
+<Steps>
+  <Step title="Pending">
+    Payment is being processed or awaiting gateway response.
+    
+    ```json
+    {
+      "payment_status": "pending",
+      "succeeded_at": null,
+      "failed_at": null
+    }
+    ```
+  </Step>
+  
+  <Step title="Succeeded">
+    Payment completed successfully.
+    
+    ```json
+    {
+      "payment_status": "succeeded",
+      "succeeded_at": "2024-03-05T14:30:00Z",
+      "gateway_payment_id": "pi_stripe_xyz"
+    }
+    ```
+  </Step>
+  
+  <Step title="Failed">
+    Payment attempt failed.
+    
+    ```json
+    {
+      "payment_status": "failed",
+      "failed_at": "2024-03-05T14:25:00Z",
+      "error_message": "Card was declined"
+    }
+    ```
+  </Step>
+  
+  <Step title="Refunded">
+    Payment was refunded to the customer.
+    
+    ```json
+    {
+      "payment_status": "refunded",
+      "refunded_at": "2024-03-10T09:00:00Z"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Payment Attempts
+
+When `track_attempts` is enabled, FlexPrice records each payment processing attempt:
+
+```json
+{
+  "track_attempts": true,
+  "attempts": [
+    {
+      "id": "attempt_1",
+      "payment_id": "pay_abc123",
+      "attempt_number": 1,
+      "payment_status": "failed",
+      "error_message": "Insufficient funds",
+      "gateway_attempt_id": "pi_attempt_1",
+      "created_at": "2024-03-05T14:20:00Z"
+    },
+    {
+      "id": "attempt_2",
+      "payment_id": "pay_abc123",
+      "attempt_number": 2,
+      "payment_status": "succeeded",
+      "gateway_attempt_id": "pi_attempt_2",
+      "created_at": "2024-03-05T14:30:00Z"
+    }
+  ]
+}
+```
+
+Attempts provide:
+- Full audit trail of payment processing
+- Debugging information for failures
+- Gateway-specific attempt IDs
+- Timing information for each retry
+
+## Gateway Integration
+
+Payments include gateway-specific fields:
+
+```json
+{
+  "payment_gateway": "stripe",
+  "gateway_payment_id": "pi_3NQw6kGzFEAbXYZJ0p1q2r3s",
+  "gateway_tracking_id": "ch_3NQw6kGzFEAbXYZJ0t4u5v6w",
+  "gateway_metadata": {
+    "stripe_customer_id": "cus_stripe_abc",
+    "payment_intent_id": "pi_3NQw6k...",
+    "charge_id": "ch_3NQw6k...",
+    "receipt_url": "https://pay.stripe.com/receipts/xyz"
+  }
+}
+```
+
+- **payment_gateway**: Gateway provider name (stripe, razorpay, etc.)
+- **gateway_payment_id**: Primary transaction ID from gateway
+- **gateway_tracking_id**: Secondary tracking ID (e.g., Stripe charge ID)
+- **gateway_metadata**: Additional gateway-specific data
+
+## Payment Validation
+
+Payments are validated before processing:
+
+<Steps>
+  <Step title="Amount Validation">
+    Payment amount must be positive and greater than zero.
+    
+    ```json
+    {
+      "amount": "930.00"
+    }
+    ```
+  </Step>
+  
+  <Step title="Destination Validation">
+    Destination type must be valid and destination ID must exist.
+    
+    ```json
+    {
+      "destination_type": "invoice",
+      "destination_id": "inv_xyz789"
+    }
+    ```
+  </Step>
+  
+  <Step title="Payment Method Validation">
+    - Offline payments: `payment_method_id` must be empty
+    - Payment links: `payment_method_id` must be empty
+    - Card payments: `payment_method_id` is optional (fetched automatically if empty)
+    - Other types: `payment_method_id` required
+  </Step>
+  
+  <Step title="Currency Validation">
+    Currency must match the destination invoice/subscription currency.
+  </Step>
+</Steps>
+
+## Idempotency
+
+Payments use idempotency keys to prevent duplicate charges:
+
+```json
+{
+  "idempotency_key": "inv_xyz789_payment_attempt_1"
+}
+```
+
+Making multiple payment requests with the same idempotency key returns the existing payment instead of creating a duplicate.
+
+<Warning>
+Always use unique, deterministic idempotency keys when creating payments programmatically. This prevents accidental double-charging during retries or network failures.
+</Warning>
+
+## Automatic Payment Collection
+
+Subscriptions with `collection_method: charge_automatically` trigger automatic payment attempts:
+
+```json
+{
+  "subscription": {
+    "collection_method": "charge_automatically",
+    "payment_behavior": "default_active",
+    "gateway_payment_method_id": "pm_card_123"
+  }
+}
+```
+
+When an invoice is generated:
+1. FlexPrice automatically creates a payment
+2. Charges the saved payment method
+3. Updates invoice payment status
+4. Retries on failure based on payment behavior
+
+## Payment Behavior Configuration
+
+Subscription `payment_behavior` controls automatic payment handling:
+
+<Tabs>
+  <Tab title="default_active">
+    Standard behavior: attempt to charge, keep subscription active even if payment fails.
+    
+    ```json
+    {
+      "payment_behavior": "default_active"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="error_if_incomplete">
+    Strict: subscription creation fails if initial payment fails.
+    
+    ```json
+    {
+      "payment_behavior": "error_if_incomplete"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="allow_incomplete">
+    Permissive: allow subscriptions with failed payments to remain active.
+    
+    ```json
+    {
+      "payment_behavior": "allow_incomplete"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="pending_if_incomplete">
+    Keep subscription in pending state until payment succeeds.
+    
+    ```json
+    {
+      "payment_behavior": "pending_if_incomplete"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Retry Logic
+
+Failed payments can be retried automatically or manually:
+
+### Automatic Retries
+
+Configured at the subscription or invoice level:
+
+```json
+{
+  "track_attempts": true,
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "payment_status": "failed",
+      "created_at": "2024-03-05T14:20:00Z"
+    },
+    {
+      "attempt_number": 2,
+      "payment_status": "failed",
+      "created_at": "2024-03-06T14:20:00Z"
+    },
+    {
+      "attempt_number": 3,
+      "payment_status": "succeeded",
+      "created_at": "2024-03-07T14:20:00Z"
+    }
+  ]
+}
+```
+
+### Manual Retries
+
+Create a new payment for the same destination:
+
+```json
+{
+  "destination_type": "invoice",
+  "destination_id": "inv_xyz789",
+  "payment_method_type": "card",
+  "idempotency_key": "inv_xyz789_retry_2"
+}
+```
+
+## Partial Payments
+
+Invoices can accept partial payments:
+
+```json
+{
+  "invoice": {
+    "amount_due": "1000.00",
+    "amount_paid": "300.00",
+    "amount_remaining": "700.00",
+    "payment_status": "partial"
+  },
+  "payments": [
+    {
+      "id": "pay_1",
+      "amount": "300.00",
+      "payment_status": "succeeded"
+    }
+  ]
+}
+```
+
+Multiple payments can be applied until the invoice is fully paid.
+
+## Overpayment
+
+When payment exceeds the amount due:
+
+```json
+{
+  "invoice": {
+    "amount_due": "1000.00",
+    "amount_paid": "1100.00",
+    "amount_remaining": "0.00",
+    "payment_status": "overpaid"
+  },
+  "payment": {
+    "amount": "1100.00",
+    "payment_status": "succeeded"
+  }
+}
+```
+
+The excess $100 is typically:
+- Applied as customer credit
+- Refunded to customer
+- Held as account balance
+
+## Recorded Payments
+
+For offline payments, use the `recorded_at` field:
+
+```json
+{
+  "payment_method_type": "offline",
+  "recorded_at": "2024-03-05T14:30:00Z",
+  "payment_status": "succeeded",
+  "metadata": {
+    "payment_type": "wire_transfer",
+    "bank_reference": "WIRE-20240305-001",
+    "received_date": "2024-03-05"
+  }
+}
+```
+
+This marks when the payment was manually recorded in the system, distinct from when it was processed.
+
+## Payment Metadata
+
+Store additional context with payments:
+
+```json
+{
+  "metadata": {
+    "ip_address": "192.168.1.1",
+    "user_agent": "Mozilla/5.0...",
+    "device_id": "device_abc",
+    "location": "New York, NY",
+    "payment_page": "checkout_v2",
+    "campaign_id": "spring_2024"
+  }
+}
+```
+
+Useful for:
+- Fraud detection
+- Analytics and reporting
+- Customer support
+- Compliance and auditing
+
+## Error Handling
+
+Payment failures include detailed error messages:
+
+```json
+{
+  "payment_status": "failed",
+  "failed_at": "2024-03-05T14:25:00Z",
+  "error_message": "Your card was declined. Please try a different payment method.",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "payment_status": "failed",
+      "error_message": "insufficient_funds",
+      "gateway_attempt_id": "pi_declined_1"
+    }
+  ]
+}
+```
+
+Common error types:
+- `card_declined`: Card issuer declined the transaction
+- `insufficient_funds`: Not enough funds in account
+- `expired_card`: Card has expired
+- `incorrect_cvc`: Card security code is incorrect
+- `processing_error`: Gateway or network error

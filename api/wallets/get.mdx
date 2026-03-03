@@ -1,0 +1,285 @@
+---
+title: "Get Wallet"
+api: "GET /v1/wallets/{id}"
+description: "Retrieve details of a specific wallet by its ID."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the wallet to retrieve
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the wallet
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  ID of the customer this wallet belongs to
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Wallet name
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Three-letter ISO currency code (e.g., USD, EUR)
+</ResponseField>
+
+<ResponseField name="wallet_type" type="string">
+  Type of wallet
+  
+  **Values:** `PREPAID`, `POSTPAID`
+</ResponseField>
+
+<ResponseField name="wallet_status" type="string">
+  Current status of the wallet
+  
+  **Values:** `ACTIVE`, `INACTIVE`, `SUSPENDED`
+</ResponseField>
+
+<ResponseField name="balance" type="string">
+  Current balance in currency
+</ResponseField>
+
+<ResponseField name="credit_balance" type="string">
+  Current balance in credits
+</ResponseField>
+
+<ResponseField name="conversion_rate" type="string">
+  Conversion rate from credits to currency during consumption
+  
+  Example: If `conversion_rate` is "2", then 1 credit = 0.5 in currency
+</ResponseField>
+
+<ResponseField name="topup_conversion_rate" type="string">
+  Conversion rate for top-ups to the currency
+  
+  Example: If `topup_conversion_rate` is "2", then 1 currency unit = 0.5 credits
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Optional description for the wallet
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata as key-value pairs
+</ResponseField>
+
+<ResponseField name="config" type="object">
+  Wallet configuration
+  
+  <Expandable title="Config object">
+    <ResponseField name="allowed_price_types" type="array">
+      Price types allowed for this wallet (e.g., ["USAGE"] for prepaid, ["ALL"] for postpaid)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="alert_settings" type="object">
+  Alert configuration for low balance notifications
+  
+  <Expandable title="Alert settings object">
+    <ResponseField name="alert_enabled" type="boolean">
+      Whether alerts are enabled
+    </ResponseField>
+    
+    <ResponseField name="threshold_type" type="string">
+      Type of threshold (PERCENTAGE or ABSOLUTE)
+    </ResponseField>
+    
+    <ResponseField name="threshold_value" type="string">
+      Threshold value that triggers alerts
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="alert_state" type="string">
+  Current alert state
+  
+  **Values:** `OK`, `WARNING`, `CRITICAL`
+</ResponseField>
+
+<ResponseField name="auto_topup" type="object">
+  Auto top-up configuration
+  
+  <Expandable title="Auto top-up object">
+    <ResponseField name="enabled" type="boolean">
+      Whether auto top-up is enabled
+    </ResponseField>
+    
+    <ResponseField name="threshold" type="string">
+      Balance threshold that triggers auto top-up
+    </ResponseField>
+    
+    <ResponseField name="amount" type="string">
+      Amount to add during auto top-up
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="credits_available_breakdown" type="object">
+  Breakdown of available credits by expiry date and priority
+  
+  <Expandable title="Breakdown object">
+    <ResponseField name="total" type="string">
+      Total available credits
+    </ResponseField>
+    
+    <ResponseField name="by_priority" type="array">
+      Credits grouped by priority level
+    </ResponseField>
+    
+    <ResponseField name="by_expiry" type="array">
+      Credits grouped by expiration date
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Timestamp when wallet was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  Timestamp when wallet was last updated
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.flexprice.io/v1/wallets/wallet_abc123" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+wallet = client.wallets.get("wallet_abc123")
+print(f"Balance: {wallet.credit_balance} credits")
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+const wallet = await client.wallets.get("wallet_abc123");
+console.log(`Balance: ${wallet.creditBalance} credits`);
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+wallet, err := client.Wallets.Get(context.Background(), "wallet_abc123")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Balance: %s credits\n", wallet.CreditBalance)
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "id": "wallet_abc123",
+  "customer_id": "cust_1234",
+  "name": "Prepaid Wallet - USD",
+  "currency": "usd",
+  "wallet_type": "PREPAID",
+  "wallet_status": "ACTIVE",
+  "balance": "75.500000000",
+  "credit_balance": "75.500000000",
+  "conversion_rate": "1.00000",
+  "topup_conversion_rate": "1.00000",
+  "description": "Primary wallet for API usage",
+  "metadata": {
+    "customer_segment": "enterprise"
+  },
+  "config": {
+    "allowed_price_types": ["USAGE"]
+  },
+  "alert_settings": {
+    "alert_enabled": true,
+    "threshold_type": "PERCENTAGE",
+    "threshold_value": "20.0"
+  },
+  "alert_state": "OK",
+  "auto_topup": {
+    "enabled": false
+  },
+  "credits_available_breakdown": {
+    "total": "75.500000000",
+    "by_priority": [
+      {
+        "priority": 1,
+        "credits": "50.000000000"
+      },
+      {
+        "priority": null,
+        "credits": "25.500000000"
+      }
+    ],
+    "by_expiry": [
+      {
+        "expiry_date": "2024-12-31T23:59:59Z",
+        "credits": "25.500000000"
+      },
+      {
+        "expiry_date": null,
+        "credits": "50.000000000"
+      }
+    ]
+  },
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-20T14:22:00Z"
+}
+```
+
+```json 404 - Not Found
+{
+  "error": {
+    "code": "not_found",
+    "message": "Wallet not found",
+    "hint": "No wallet exists with the provided ID"
+  }
+}
+```
+</ResponseExample>
+
+## Understanding Wallet Balance
+
+The wallet balance is represented in two ways:
+
+1. **`balance`**: Balance in the wallet's currency (e.g., USD)
+2. **`credit_balance`**: Balance in credits
+
+These values are related by the `conversion_rate`:
+
+```
+balance = credit_balance / conversion_rate
+```
+
+**Example:**
+- `credit_balance`: 100 credits
+- `conversion_rate`: 2
+- `balance`: 100 / 2 = $50 USD
+
+## Credits Available Breakdown
+
+The `credits_available_breakdown` field provides insight into how credits are organized:
+
+<AccordionGroup>
+  <Accordion title="By Priority">
+    Credits with lower priority numbers are consumed first. This is useful for:
+    - Using promotional credits before paid credits
+    - Implementing credit hierarchies
+    - Managing multiple credit sources
+    
+    Priority `null` indicates no specific priority (consumed after prioritized credits).
+  </Accordion>
+  
+  <Accordion title="By Expiry">
+    Credits grouped by expiration date. Credits expiring soonest are consumed first.
+    
+    Expiry `null` indicates credits that never expire.
+  </Accordion>
+</AccordionGroup>

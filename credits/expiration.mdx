@@ -1,0 +1,553 @@
+---
+title: Credit Expiration
+description: Manage credit expiration policies and expired credit processing
+---
+
+## Overview
+
+Credit expiration ensures that promotional or time-limited credits are used within their validity period. FlexPrice tracks expiration dates at the transaction level and automatically processes expired credits.
+
+## How Credit Expiration Works
+
+When credits are added to a wallet, each transaction can have an optional expiration date:
+
+```json
+{
+  "id": "wtxn_1234567890",
+  "wallet_id": "wallet_1234567890",
+  "type": "CREDIT",
+  "credit_amount": "100.00",
+  "credits_available": "100.00",
+  "expiry_date": "2024-12-31T23:59:59Z",
+  "transaction_reason": "FREE_CREDIT_GRANT"
+}
+```
+
+- **Before expiry:** Credits with `credits_available > 0` can be consumed
+- **After expiry:** Credits are marked as expired and removed from available balance
+- **No expiry date:** Credits never expire (common for purchased credits)
+
+## Setting Expiration Dates
+
+### On Wallet Top-Up
+
+Set expiration when manually adding credits:
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "500.00",
+  "transaction_reason": "FREE_CREDIT_GRANT",
+  "expiry_date_utc": "2024-06-30T23:59:59Z",
+  "description": "Q2 promotional credits"
+}
+```
+
+<Note>
+Expiry date must be in the future. Use ISO 8601 format in UTC timezone.
+</Note>
+
+### On Wallet Creation
+
+Set expiration for initial credits:
+
+```json
+POST /v1/wallets
+{
+  "customer_id": "cust_1234567890",
+  "currency": "usd",
+  "wallet_type": "PRE_PAID",
+  "initial_credits_to_load": "100.00",
+  "initial_credits_expiry_date_utc": "2024-12-31T23:59:59Z"
+}
+```
+
+### Via Credit Grants
+
+Credit grants define expiration policy that applies to all granted credits:
+
+**Never expire:**
+```json
+{
+  "expiration_type": "NEVER"
+}
+```
+
+**Duration-based:**
+```json
+{
+  "expiration_type": "DURATION",
+  "expiration_duration": 90,
+  "expiration_duration_unit": "DAY"
+}
+```
+
+**Billing cycle:**
+```json
+{
+  "expiration_type": "BILLING_CYCLE"
+}
+```
+
+See [Credit Grants](/credits/grants) for full expiration configuration details.
+
+## Credit Consumption Order
+
+When a wallet has multiple credit transactions, FlexPrice consumes them in this order:
+
+<Steps>
+
+<Step title="Priority">
+Lower priority numbers are used first:
+
+```json
+[
+  {"priority": 1, "credits_available": "50.00"},   // Used first
+  {"priority": 5, "credits_available": "100.00"},
+  {"priority": 10, "credits_available": "200.00"}  // Used last
+]
+```
+</Step>
+
+<Step title="Expiry date">
+For same priority, credits expiring soonest are used first:
+
+```json
+[
+  {"priority": 1, "expiry_date": "2024-03-31T23:59:59Z"},  // Used first
+  {"priority": 1, "expiry_date": "2024-06-30T23:59:59Z"},
+  {"priority": 1, "expiry_date": null}  // Used last (never expires)
+]
+```
+</Step>
+
+<Step title="Creation date">
+For same priority and expiry, oldest credits are used first (FIFO):
+
+```json
+[
+  {"created_at": "2024-01-01T00:00:00Z"},  // Used first
+  {"created_at": "2024-01-15T00:00:00Z"},
+  {"created_at": "2024-02-01T00:00:00Z"}  // Used last
+]
+```
+</Step>
+
+</Steps>
+
+<Note>
+This ordering ensures expiring credits are consumed before they expire, maximizing value for customers.
+</Note>
+
+## Expired Credit Processing
+
+FlexPrice automatically processes expired credits via a cron job:
+
+```bash
+POST /v1/cron/expire-credits
+```
+
+### What Happens During Processing
+
+<Steps>
+
+<Step title="Identify expired credits">
+Finds all wallet transactions where:
+- `expiry_date < current time`
+- `credits_available > 0`
+- `transaction_status = COMPLETED`
+</Step>
+
+<Step title="Check for active subscriptions">
+If the customer has active subscriptions, expiration may be skipped to prevent service disruption.
+</Step>
+
+<Step title="Check for active invoices">
+If the customer has open invoices that might use these credits, expiration may be deferred.
+</Step>
+
+<Step title="Create debit transaction">
+For credits that expire, a debit transaction is created:
+
+```json
+{
+  "type": "DEBIT",
+  "credit_amount": "50.00",
+  "transaction_reason": "CREDIT_EXPIRED",
+  "reference_type": "EXTERNAL",
+  "reference_id": "expired_wtxn_1234567890",
+  "description": "Expired promotional credits"
+}
+```
+</Step>
+
+<Step title="Update wallet balance">
+Wallet `credit_balance` is reduced by the expired amount.
+</Step>
+
+<Step title="Update original transaction">
+The original credit transaction's `credits_available` is set to 0.
+</Step>
+
+</Steps>
+
+### Expiration Results
+
+The cron endpoint returns details about expired credits:
+
+```json
+{
+  "items": [
+    {
+      "tenant_id": "tenant_1234567890",
+      "environment_id": "env_production",
+      "count": 45,
+      "success": 40,
+      "failed": 0,
+      "skipped_due_to_active_subscription": 3,
+      "skipped_due_to_active_invoice": 2
+    }
+  ],
+  "total": 45,
+  "success": 40,
+  "failed": 0,
+  "skipped_due_to_active_subscription": 3,
+  "skipped_due_to_active_invoice": 2
+}
+```
+
+## Skip Reasons
+
+Credit expiration may be skipped for business reasons:
+
+### Active Subscription Skip
+
+**Reason:** `active_subscription`
+
+If a customer has an active subscription, expiring credits might disrupt their service:
+
+```json
+{
+  "expired": false,
+  "skip_reason": "active_subscription"
+}
+```
+
+**Recommendation:** Configure this behavior based on your business model:
+- SaaS products: May want to skip to avoid service disruption
+- Pay-as-you-go: May want to expire regardless of subscription status
+
+### Active Invoice Skip
+
+**Reason:** `active_invoice`
+
+If a customer has open invoices, they might need credits to pay them:
+
+```json
+{
+  "expired": false,
+  "skip_reason": "active_invoice"
+}
+```
+
+**Recommendation:** Consider grace period:
+- Skip expiration for invoices due within 7 days
+- Allow expiration for overdue invoices (customer had opportunity to use credits)
+
+<Warning>
+Skipped credits will be checked again in the next expiration run. Implement monitoring to ensure credits don't stay in limbo indefinitely.
+</Warning>
+
+## Monitoring Expiring Credits
+
+### List Expiring Credits
+
+Find credits expiring soon:
+
+```bash
+GET /v1/wallets/{wallet_id}/transactions
+  ?type=CREDIT
+  &transaction_status=COMPLETED
+  &expiry_date_before=2024-12-31T23:59:59Z
+```
+
+Filter by date range to find credits expiring in next 30 days:
+
+```bash
+GET /v1/wallets/{wallet_id}/transactions
+  ?type=CREDIT
+  &expiry_date_after=2024-01-01T00:00:00Z
+  &expiry_date_before=2024-01-31T23:59:59Z
+```
+
+### Check Wallet for Expiring Credits
+
+Get wallet balance with expiring credit breakdown:
+
+```bash
+GET /v1/wallets/{wallet_id}/balance?include_real_time_balance=true
+```
+
+<Note>
+While the API doesn't directly provide "expiring soon" breakdown, you can calculate this client-side by fetching transactions and filtering by expiry date.
+</Note>
+
+### Customer Notifications
+
+Notify customers before credits expire:
+
+1. Query wallets for credits expiring in next 7 days
+2. Calculate total expiring amount per customer
+3. Send email or in-app notification:
+   - Amount expiring
+   - Expiry date
+   - Suggestions for using credits
+   - Link to account or services
+
+## Best Practices
+
+### Expiration Date Selection
+
+**Promotional credits:**
+- Short term: 30-60 days (encourages quick adoption)
+- Medium term: 90-180 days (allows evaluation)
+- Long term: 365+ days (customer flexibility)
+
+**Trial credits:**
+- 7-14 days for quick trials
+- 30 days for full product evaluation
+- Align with subscription trial period
+
+**Purchased credits:**
+- 12-24 months minimum
+- Consider no expiration for full purchases
+- Clearly communicate expiration in sales terms
+
+**Subscription credits:**
+- Use `BILLING_CYCLE` expiration
+- Creates "use it or lose it" urgency
+- Simplifies accounting and forecasting
+
+### Expiration Communication
+
+<Steps>
+
+<Step title="At credit grant">
+Inform customers immediately when credits are granted:
+
+"You've received 500 credits! These expire on December 31, 2024."
+</Step>
+
+<Step title="30 days before expiry">
+First reminder:
+
+"Reminder: You have 500 credits expiring in 30 days. Use them for [service benefits]."
+</Step>
+
+<Step title="7 days before expiry">
+Urgent reminder:
+
+"Last chance! 500 credits expire in 7 days. Don't miss out on [benefits]."
+</Step>
+
+<Step title="After expiry">
+Inform about expired credits:
+
+"500 credits expired on December 31. Purchase more credits or upgrade your plan for additional benefits."
+</Step>
+
+</Steps>
+
+### Credit Priority Strategy
+
+Assign priorities to ensure promotional credits are used first:
+
+```json
+[
+  {"priority": 1, "type": "Expiring promotional credits"},
+  {"priority": 5, "type": "Non-expiring promotional credits"},
+  {"priority": 10, "type": "Plan-included credits"},
+  {"priority": 20, "type": "Purchased credits (non-expiring)"}
+]
+```
+
+This maximizes the value customers get from expiring credits.
+
+### Monitoring and Alerting
+
+- Track expiration rates (what % of credits expire unused)
+- Alert on high expiration rates (may indicate poor communication or product fit)
+- Monitor skipped expirations (active subscriptions/invoices)
+- Dashboard showing credits expiring in next 30/60/90 days
+
+### Testing Expiration
+
+1. Create test wallet with credits expiring tomorrow
+2. Run expiration cron manually
+3. Verify debit transaction created
+4. Check wallet balance updated
+5. Confirm original transaction marked expired
+6. Test skip conditions (active subscription/invoice)
+
+## Common Patterns
+
+### Trial Period Credits
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "100.00",
+  "transaction_reason": "FREE_CREDIT_GRANT",
+  "expiry_date_utc": "2024-02-14T23:59:59Z",  // 14 days from now
+  "priority": 1,
+  "description": "14-day trial credits"
+}
+```
+
+### Seasonal Promotion
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "500.00",
+  "transaction_reason": "FREE_CREDIT_GRANT",
+  "expiry_date_utc": "2024-12-31T23:59:59Z",  // End of quarter
+  "priority": 1,
+  "description": "Q4 holiday promotion"
+}
+```
+
+### Purchased Credit Package
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "10000.00",
+  "transaction_reason": "PURCHASED_CREDIT_DIRECT",
+  "expiry_date_utc": "2026-01-01T00:00:00Z",  // 2 years
+  "priority": 20,
+  "description": "Purchased credit package"
+}
+```
+
+### Non-Expiring Credits
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "1000.00",
+  "transaction_reason": "PURCHASED_CREDIT_DIRECT",
+  "expiry_date_utc": null,  // Never expires
+  "priority": 20,
+  "description": "Purchased credits"
+}
+```
+
+## Accounting Considerations
+
+### Revenue Recognition
+
+Expired credits may have accounting implications:
+
+- **Prepaid credits:** Expired credits may become recognized revenue
+- **Promotional credits:** Typically no revenue impact (marketing expense)
+- **Refundable credits:** May require liability adjustment
+
+**Recommendation:** Consult with accounting team on expiration revenue treatment.
+
+### Reporting
+
+Track credit expiration metrics:
+- Total credits expired per period
+- Expiration rate (expired / granted)
+- Revenue impact of expired prepaid credits
+- Customer segments with high expiration rates
+
+### Audit Trail
+
+Each expiration creates a clear audit trail:
+
+1. Original credit transaction with expiry date
+2. Debit transaction with `transaction_reason: CREDIT_EXPIRED`
+3. Reference linking debit to expired credit
+4. Updated `credits_available` on original transaction
+
+## Troubleshooting
+
+### Credits Not Expiring
+
+**Check expiry date format:**
+```bash
+GET /v1/wallets/{wallet_id}/transactions/{transaction_id}
+```
+
+Verify `expiry_date` is set and in ISO 8601 format with UTC timezone.
+
+**Check transaction status:**
+Only `COMPLETED` transactions are eligible for expiration. `PENDING` transactions (e.g., unpaid invoiced credits) won't expire.
+
+**Run expiration manually:**
+```bash
+POST /v1/cron/expire-credits
+```
+
+Check response for skip reasons.
+
+### Credits Expired Prematurely
+
+**Verify timezone:**
+Expiry dates are in UTC. Customer's local timezone may differ:
+
+```json
+{
+  "expiry_date": "2024-12-31T23:59:59Z"  // UTC
+}
+```
+
+This expires at December 31 11:59 PM UTC, which may be January 1 in some timezones.
+
+**Check cron schedule:**
+If cron runs multiple times per day, credits may expire as soon as the expiry date passes.
+
+### Skipped Expirations Accumulating
+
+**Query skipped credits:**
+```bash
+GET /v1/wallets/{wallet_id}/transactions
+  ?type=CREDIT
+  &expiry_date_before=2024-01-01T00:00:00Z
+  &transaction_status=COMPLETED
+```
+
+**Check subscription status:**
+If subscription is perpetually active, credits may never expire.
+
+**Manual expiration:**
+Use manual debit to expire credits that are stuck:
+
+```json
+POST /v1/wallets/{wallet_id}/debit
+{
+  "credits": "50.00",
+  "transaction_reason": "MANUAL_BALANCE_DEBIT",
+  "idempotency_key": "manual-expiry-wtxn_1234567890",
+  "description": "Manual expiration of stuck credits"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallets" icon="wallet" href="/credits/wallets">
+    Learn about wallet management
+  </Card>
+  <Card title="Credit Grants" icon="gift" href="/credits/grants">
+    Configure automatic credit allocation
+  </Card>
+  <Card title="Auto Top-Up" icon="rotate" href="/credits/top-ups">
+    Set up automatic credit replenishment
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/webhooks/overview">
+    React to credit events in real-time
+  </Card>
+</CardGroup>

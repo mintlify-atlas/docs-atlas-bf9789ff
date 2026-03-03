@@ -1,0 +1,412 @@
+---
+title: "Check Feature Access"
+api: "GET /v1/customers/{id}/entitlements"
+description: "Use when checking what a customer can access (e.g. feature gating or usage limits). Supports optional filters (feature_ids, subscription_ids)."
+---
+
+<Note>
+  This endpoint returns customer entitlements which determine feature access. Use it to gate features in your application based on the customer's active subscriptions and plan entitlements.
+</Note>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the customer
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="feature_ids" type="array">
+  Filter by specific feature IDs
+  
+  Can be provided multiple times: `?feature_ids=feat_1&feature_ids=feat_2`
+</ParamField>
+
+<ParamField query="subscription_ids" type="array">
+  Filter by specific subscription IDs
+  
+  Can be provided multiple times: `?subscription_ids=sub_1&subscription_ids=sub_2`
+</ParamField>
+
+<ParamField query="feature_types" type="array">
+  Filter by feature types
+  
+  **Values:** `BOOLEAN`, `METERED`, `STATIC`
+</ParamField>
+
+## Response
+
+<ResponseField name="customer_id" type="string">
+  ID of the customer
+</ResponseField>
+
+<ResponseField name="entitlements" type="array">
+  Array of entitlement objects representing the customer's feature access
+  
+  <Expandable title="Entitlement object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the entitlement
+    </ResponseField>
+    
+    <ResponseField name="feature_id" type="string">
+      ID of the feature
+    </ResponseField>
+    
+    <ResponseField name="feature_type" type="string">
+      Type of feature (BOOLEAN, METERED, or STATIC)
+    </ResponseField>
+    
+    <ResponseField name="is_enabled" type="boolean">
+      Whether the feature is enabled for this customer
+    </ResponseField>
+    
+    <ResponseField name="usage_limit" type="integer">
+      Usage limit for metered features (null if unlimited)
+    </ResponseField>
+    
+    <ResponseField name="usage_reset_period" type="string">
+      How often usage resets for metered features
+      
+      **Values:** `NONE`, `DAILY`, `WEEKLY`, `MONTHLY`, `BILLING_PERIOD`
+    </ResponseField>
+    
+    <ResponseField name="is_soft_limit" type="boolean">
+      Whether the limit is a soft limit (warning) or hard limit (enforcement)
+    </ResponseField>
+    
+    <ResponseField name="static_value" type="string">
+      Value for static features (e.g., "5", "10GB", "Unlimited")
+    </ResponseField>
+    
+    <ResponseField name="current_usage" type="integer">
+      Current usage for metered features in the current period
+    </ResponseField>
+    
+    <ResponseField name="remaining_usage" type="integer">
+      Remaining usage before hitting the limit (null if unlimited)
+    </ResponseField>
+    
+    <ResponseField name="feature" type="object">
+      Feature details (name, description, etc.)
+    </ResponseField>
+    
+    <ResponseField name="entity_type" type="string">
+      Type of entity this entitlement comes from
+      
+      **Values:** `PLAN`, `ADDON`, `SUBSCRIPTION`
+    </ResponseField>
+    
+    <ResponseField name="entity_id" type="string">
+      ID of the entity (plan_id, addon_id, or subscription_id)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="subscriptions" type="array">
+  Array of active subscriptions for the customer
+</ResponseField>
+
+<RequestExample>
+```bash cURL - Check all feature access
+curl -X GET "https://api.flexprice.io/v1/customers/cust_1234/entitlements" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - Check specific feature
+curl -X GET "https://api.flexprice.io/v1/customers/cust_1234/entitlements?feature_ids=feat_api_calls" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - Check metered features only
+curl -X GET "https://api.flexprice.io/v1/customers/cust_1234/entitlements?feature_types=METERED" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+# Check all feature access
+entitlements = client.customers.entitlements.list("cust_1234")
+
+# Check specific feature
+entitlements = client.customers.entitlements.list(
+    "cust_1234",
+    feature_ids=["feat_api_calls"]
+)
+
+# Gate a feature in your app
+api_access = next(
+    (e for e in entitlements.entitlements if e.feature_id == "feat_api_calls"),
+    None
+)
+
+if api_access and api_access.is_enabled:
+    if api_access.remaining_usage and api_access.remaining_usage > 0:
+        # Allow API call
+        pass
+    else:
+        # Show usage limit error
+        pass
+else:
+    # Show feature not available error
+    pass
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+// Check all feature access
+const entitlements = await client.customers.entitlements.list("cust_1234");
+
+// Check specific feature
+const entitlements = await client.customers.entitlements.list("cust_1234", {
+  featureIds: ["feat_api_calls"]
+});
+
+// Gate a feature in your app
+const apiAccess = entitlements.entitlements.find(
+  e => e.featureId === "feat_api_calls"
+);
+
+if (apiAccess?.isEnabled) {
+  if (apiAccess.remainingUsage && apiAccess.remainingUsage > 0) {
+    // Allow API call
+  } else {
+    // Show usage limit error
+  }
+} else {
+  // Show feature not available error
+}
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+// Check all feature access
+entitlements, err := client.Customers.Entitlements.List(context.Background(), "cust_1234", nil)
+
+// Check specific feature
+entitlements, err := client.Customers.Entitlements.List(
+    context.Background(),
+    "cust_1234",
+    &flexprice.CustomerEntitlementsParams{
+        FeatureIDs: []string{"feat_api_calls"},
+    },
+)
+
+// Gate a feature in your app
+var apiAccess *flexprice.Entitlement
+for _, e := range entitlements.Entitlements {
+    if e.FeatureID == "feat_api_calls" {
+        apiAccess = e
+        break
+    }
+}
+
+if apiAccess != nil && apiAccess.IsEnabled {
+    if apiAccess.RemainingUsage != nil && *apiAccess.RemainingUsage > 0 {
+        // Allow API call
+    } else {
+        // Show usage limit error
+    }
+} else {
+    // Show feature not available error
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "customer_id": "cust_1234",
+  "entitlements": [
+    {
+      "id": "ent_abc123",
+      "feature_id": "feat_api_calls",
+      "feature_type": "METERED",
+      "is_enabled": true,
+      "usage_limit": 10000,
+      "usage_reset_period": "MONTHLY",
+      "is_soft_limit": false,
+      "current_usage": 2350,
+      "remaining_usage": 7650,
+      "feature": {
+        "id": "feat_api_calls",
+        "name": "API Calls",
+        "lookup_key": "api_calls",
+        "type": "METERED",
+        "unit_singular": "API call",
+        "unit_plural": "API calls"
+      },
+      "entity_type": "PLAN",
+      "entity_id": "plan_pro"
+    },
+    {
+      "id": "ent_def456",
+      "feature_id": "feat_advanced_analytics",
+      "feature_type": "BOOLEAN",
+      "is_enabled": true,
+      "feature": {
+        "id": "feat_advanced_analytics",
+        "name": "Advanced Analytics",
+        "lookup_key": "advanced_analytics",
+        "type": "BOOLEAN"
+      },
+      "entity_type": "PLAN",
+      "entity_id": "plan_pro"
+    },
+    {
+      "id": "ent_ghi789",
+      "feature_id": "feat_team_members",
+      "feature_type": "STATIC",
+      "is_enabled": true,
+      "static_value": "10",
+      "feature": {
+        "id": "feat_team_members",
+        "name": "Team Members",
+        "lookup_key": "team_members",
+        "type": "STATIC"
+      },
+      "entity_type": "PLAN",
+      "entity_id": "plan_pro"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub_5678",
+      "plan_id": "plan_pro",
+      "status": "ACTIVE"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+## Feature Gating Patterns
+
+<AccordionGroup>
+  <Accordion title="Boolean Feature Gates">
+    For simple on/off features, check the `is_enabled` flag:
+    
+    ```python
+    entitlements = client.customers.entitlements.list(
+        customer_id,
+        feature_ids=["feat_advanced_analytics"]
+    )
+    
+    analytics_enabled = (
+        len(entitlements.entitlements) > 0 and
+        entitlements.entitlements[0].is_enabled
+    )
+    
+    if analytics_enabled:
+        # Show advanced analytics
+        pass
+    else:
+        # Show upgrade prompt
+        pass
+    ```
+  </Accordion>
+  
+  <Accordion title="Metered Feature with Usage Tracking">
+    For usage-based features, check both access and remaining usage:
+    
+    ```typescript
+    const entitlements = await client.customers.entitlements.list(
+      customerId,
+      { featureIds: ["feat_api_calls"] }
+    );
+    
+    const apiAccess = entitlements.entitlements[0];
+    
+    if (!apiAccess?.isEnabled) {
+      throw new Error("API access not available on your plan");
+    }
+    
+    if (apiAccess.remainingUsage !== null && apiAccess.remainingUsage <= 0) {
+      if (apiAccess.isSoftLimit) {
+        // Warn but allow
+        console.warn("You've exceeded your API limit");
+      } else {
+        // Hard limit - block
+        throw new Error("API limit exceeded. Please upgrade your plan.");
+      }
+    }
+    
+    // Allow API call and track usage
+    await makeApiCall();
+    ```
+  </Accordion>
+  
+  <Accordion title="Static Feature Values">
+    For configuration-based features, use the `static_value`:
+    
+    ```go
+    entitlements, _ := client.Customers.Entitlements.List(
+        ctx,
+        customerID,
+        &flexprice.CustomerEntitlementsParams{
+            FeatureIDs: []string{"feat_team_members"},
+        },
+    )
+    
+    teamAccess := entitlements.Entitlements[0]
+    maxTeamMembers, _ := strconv.Atoi(teamAccess.StaticValue)
+    
+    if currentTeamSize >= maxTeamMembers {
+        return errors.New("Team member limit reached. Please upgrade.")
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Caching Recommendations
+
+<Tip>
+  To reduce latency, cache entitlement responses for a few minutes. Invalidate the cache when:
+  - Customer's subscription changes
+  - Plan is modified
+  - Entitlements are manually updated
+</Tip>
+
+```python
+import redis
+import json
+from datetime import timedelta
+
+redis_client = redis.Redis()
+
+def check_feature_access(customer_id: str, feature_id: str) -> dict:
+    cache_key = f"entitlements:{customer_id}"
+    
+    # Try cache first
+    cached = redis_client.get(cache_key)
+    if cached:
+        entitlements = json.loads(cached)
+    else:
+        # Fetch from API
+        response = client.customers.entitlements.list(customer_id)
+        entitlements = response.entitlements
+        
+        # Cache for 5 minutes
+        redis_client.setex(
+            cache_key,
+            timedelta(minutes=5),
+            json.dumps(entitlements)
+        )
+    
+    # Find specific feature
+    return next(
+        (e for e in entitlements if e.feature_id == feature_id),
+        None
+    )
+```
+
+## Webhook Integration
+
+Stay synchronized with subscription changes by listening to webhooks:
+
+- `subscription.activated` - Refresh entitlements cache
+- `subscription.canceled` - Clear entitlements cache
+- `subscription.updated` - Refresh if plan changed
+- `entitlement.updated` - Refresh entitlements cache

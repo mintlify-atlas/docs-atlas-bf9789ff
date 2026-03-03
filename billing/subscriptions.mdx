@@ -1,0 +1,356 @@
+---
+title: 'Subscription Lifecycle'
+description: 'Manage subscription states, billing cycles, and lifecycle events in FlexPrice'
+---
+
+## Overview
+
+Subscriptions in FlexPrice represent an ongoing billing relationship between a customer and a plan. They handle recurring charges, usage tracking, trial periods, and complex lifecycle management including pausing, cancellation, and plan changes.
+
+## Subscription States
+
+Subscriptions progress through different states during their lifecycle:
+
+<Steps>
+  <Step title="Active">
+    The subscription is currently active and billing normally. This is the primary operational state where usage is tracked and invoices are generated.
+  </Step>
+  
+  <Step title="Trialing">
+    The subscription is in a trial period. No invoices are generated during this time, but usage may still be tracked.
+  </Step>
+  
+  <Step title="Paused">
+    The subscription has been temporarily paused. Billing is suspended based on the pause configuration.
+  </Step>
+  
+  <Step title="Cancelled">
+    The subscription has been cancelled and is no longer active. Can be immediate or at period end.
+  </Step>
+</Steps>
+
+## Subscription Structure
+
+A subscription contains comprehensive billing and lifecycle information:
+
+```json
+{
+  "id": "sub_abc123",
+  "lookup_key": "customer-prod-subscription",
+  "customer_id": "cus_xyz789",
+  "plan_id": "plan_premium",
+  "subscription_status": "active",
+  "currency": "usd",
+  "billing_anchor": "2024-01-01T00:00:00Z",
+  "billing_cycle": "anniversary",
+  "billing_cadence": "in_advance",
+  "billing_period": "month",
+  "billing_period_count": 1,
+  "start_date": "2024-01-01T00:00:00Z",
+  "current_period_start": "2024-03-01T00:00:00Z",
+  "current_period_end": "2024-04-01T00:00:00Z",
+  "trial_start": null,
+  "trial_end": null,
+  "cancel_at_period_end": false,
+  "payment_behavior": "default_active",
+  "collection_method": "charge_automatically",
+  "proration_behavior": "create_prorations",
+  "commitment_amount": "10000.00",
+  "commitment_duration": "year",
+  "overage_factor": "1.5",
+  "payment_terms": "30_NET",
+  "metadata": {
+    "contract_id": "CONTRACT-2024-001"
+  }
+}
+```
+
+## Billing Cycles
+
+### Anniversary vs Calendar Billing
+
+FlexPrice supports two billing cycle modes:
+
+<Tabs>
+  <Tab title="Anniversary Billing">
+    The billing anchor is set to the subscription start date. Each billing period begins on the same day as the subscription started.
+    
+    **Example:** Subscription starts on January 15th
+    - Period 1: Jan 15 - Feb 15
+    - Period 2: Feb 15 - Mar 15
+    - Period 3: Mar 15 - Apr 15
+  </Tab>
+  
+  <Tab title="Calendar Billing">
+    The billing anchor is set based on calendar boundaries. For monthly subscriptions, this aligns to the first of each month.
+    
+    **Example:** Subscription starts on January 15th
+    - Period 1: Jan 15 - Feb 1 (prorated)
+    - Period 2: Feb 1 - Mar 1
+    - Period 3: Mar 1 - Apr 1
+  </Tab>
+</Tabs>
+
+### Billing Cadence
+
+Determines when charges are applied:
+
+- **in_advance**: Bill at the start of each period (most common)
+- **in_arrears**: Bill at the end of each period (usage-based pricing)
+
+## Trial Periods
+
+Subscriptions can include trial periods where customers use the service without being charged:
+
+```json
+{
+  "subscription_status": "trialing",
+  "trial_start": "2024-01-01T00:00:00Z",
+  "trial_end": "2024-01-15T00:00:00Z",
+  "start_date": "2024-01-01T00:00:00Z",
+  "current_period_start": "2024-01-01T00:00:00Z",
+  "current_period_end": "2024-01-15T00:00:00Z"
+}
+```
+
+When the trial ends, the subscription automatically transitions to `active` status and billing begins.
+
+## Subscription Phases
+
+Phases allow subscriptions to evolve over time with different configurations:
+
+```json
+{
+  "id": "phase_intro",
+  "subscription_id": "sub_abc123",
+  "start_date": "2024-01-01T00:00:00Z",
+  "end_date": "2024-04-01T00:00:00Z",
+  "metadata": {
+    "phase_name": "introductory_pricing",
+    "discount": "50%"
+  }
+}
+```
+
+Phases are useful for:
+- Introductory pricing periods
+- Graduated pricing tiers
+- Time-limited promotions
+- Contract renewal tracking
+
+## Pausing Subscriptions
+
+Subscriptions can be paused temporarily without cancellation:
+
+```json
+{
+  "pause_status": "paused",
+  "active_pause_id": "pause_xyz",
+  "pauses": [
+    {
+      "id": "pause_xyz",
+      "subscription_id": "sub_abc123",
+      "pause_start": "2024-02-01T00:00:00Z",
+      "pause_end": "2024-03-01T00:00:00Z",
+      "behavior": "void"
+    }
+  ]
+}
+```
+
+<Warning>
+When a subscription is paused, billing and usage tracking behavior depends on the pause configuration. The `behavior` field determines whether charges are voided, deferred, or continue to accrue.
+</Warning>
+
+## Cancellation
+
+### Immediate Cancellation
+
+Cancels the subscription immediately:
+
+```json
+{
+  "subscription_status": "cancelled",
+  "cancelled_at": "2024-03-15T10:30:00Z",
+  "cancel_at_period_end": false,
+  "end_date": "2024-03-15T10:30:00Z"
+}
+```
+
+With immediate cancellation:
+- Access ends immediately
+- Proration may be applied based on `proration_behavior`
+- A final invoice may be generated
+
+### Cancel at Period End
+
+Schedules cancellation for the end of the current billing period:
+
+```json
+{
+  "subscription_status": "active",
+  "cancel_at_period_end": true,
+  "cancel_at": "2024-04-01T00:00:00Z",
+  "current_period_end": "2024-04-01T00:00:00Z"
+}
+```
+
+Benefits:
+- Customer retains access through the paid period
+- No refunds or proration needed
+- Clean billing cycle completion
+
+## Commitments and Overages
+
+Subscriptions can include minimum commitments with overage pricing:
+
+```json
+{
+  "commitment_amount": "10000.00",
+  "commitment_duration": "year",
+  "overage_factor": "1.5",
+  "enable_true_up": true
+}
+```
+
+<Steps>
+  <Step title="Commitment Amount">
+    The minimum amount a customer commits to paying per commitment period (e.g., $10,000/year on a monthly subscription).
+  </Step>
+  
+  <Step title="Overage Factor">
+    Multiplier applied to usage beyond the commitment amount. A factor of 1.5 means overage usage costs 1.5x the base rate.
+  </Step>
+  
+  <Step title="True-Up">
+    When enabled, generates a reconciliation charge if commitment is not met at the end of the commitment period.
+  </Step>
+</Steps>
+
+## Proration Behavior
+
+When subscriptions change mid-period, proration determines how to handle partial periods:
+
+<Tabs>
+  <Tab title="create_prorations">
+    Automatically creates credit/charge line items on invoices for unused time on the old plan and new charges for the new plan.
+    
+    ```json
+    {
+      "proration_behavior": "create_prorations"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="none">
+    No proration is applied. The customer pays the full amount for both periods. Useful for previews or specific business policies.
+    
+    ```json
+    {
+      "proration_behavior": "none"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Line Items
+
+Subscriptions contain line items representing individual charges:
+
+```json
+{
+  "line_items": [
+    {
+      "id": "sli_base",
+      "subscription_id": "sub_abc123",
+      "price_id": "price_seat_monthly",
+      "quantity": "10",
+      "amount": "500.00",
+      "metadata": {
+        "department": "engineering"
+      }
+    },
+    {
+      "id": "sli_usage",
+      "subscription_id": "sub_abc123",
+      "price_id": "price_api_calls",
+      "quantity": "150000",
+      "amount": "300.00",
+      "metadata": {
+        "tier": "standard"
+      }
+    }
+  ]
+}
+```
+
+## Payment Configuration
+
+### Payment Behavior
+
+Controls how subscription payments are handled:
+
+- `default_active`: Attempt to charge the default payment method
+- `allow_incomplete`: Allow subscriptions with failed payments to remain active
+- `error_if_incomplete`: Subscription creation fails if payment fails
+- `pending_if_incomplete`: Keep subscription pending until payment succeeds
+
+### Collection Method
+
+Determines invoice collection approach:
+
+- `charge_automatically`: Automatically charge the payment method on file
+- `send_invoice`: Email invoice to customer for manual payment
+
+### Payment Terms
+
+Defines when payment is due relative to invoice generation:
+
+```json
+{
+  "payment_terms": "30_NET"
+}
+```
+
+Supported terms: `15_NET`, `30_NET`, `45_NET`, `60_NET`, `75_NET`, `90_NET`
+
+## Invoicing Customer
+
+Subscriptions support separate invoicing customers for hierarchical billing:
+
+```json
+{
+  "customer_id": "cus_child_company",
+  "invoicing_customer_id": "cus_parent_company",
+  "parent_subscription_id": "sub_parent"
+}
+```
+
+This allows:
+- Parent companies to be invoiced for child subscriptions
+- Centralized billing for organization hierarchies
+- Department-level subscriptions with company-level invoicing
+
+## Customer Timezone
+
+Billing calculations respect customer timezone:
+
+```json
+{
+  "customer_timezone": "America/New_York"
+}
+```
+
+This ensures billing periods align with the customer's local business day, avoiding confusion about when periods start/end.
+
+## Version Control
+
+Subscriptions use optimistic locking to prevent concurrent modifications:
+
+```json
+{
+  "version": 3
+}
+```
+
+The version increments with each update, ensuring safe concurrent operations in distributed systems.

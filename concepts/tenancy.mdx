@@ -1,0 +1,98 @@
+---
+title: Multi-tenancy & environments
+description: Understanding FlexPrice's tenant and environment isolation model
+---
+
+FlexPrice uses a multi-tenant architecture where each tenant represents an organization or company, and within each tenant, you can have multiple environments.
+
+## Tenants
+
+A **tenant** is the top-level isolation boundary in FlexPrice. Each tenant has:
+
+- Complete data isolation from other tenants
+- Separate billing configuration
+- Independent user management
+- Own integration settings
+
+<Info>
+In a self-hosted deployment, you control your tenant data. In the cloud version, each customer account is a separate tenant.
+</Info>
+
+## Environments
+
+Within each tenant, you can create multiple **environments**:
+
+- **Production** - Live customer data and billing
+- **Staging** - Pre-production testing
+- **Development** - Local development and testing
+
+<CardGroup cols={2}>
+  <Card title="Complete Isolation" icon="shield">
+    Each environment has its own customers, meters, plans, and invoices
+  </Card>
+  <Card title="Same Configuration" icon="copy">
+    Share plan templates and pricing models across environments
+  </Card>
+</CardGroup>
+
+## How It Works
+
+Every API request must specify both tenant and environment:
+
+```bash
+curl https://api.flexprice.io/v1/customers \
+  -H "X-API-Key: your-api-key" \
+  -H "X-Tenant-Id: tenant_123" \
+  -H "X-Environment: production"
+```
+
+<Note>
+API keys are scoped to a specific tenant and environment combination.
+</Note>
+
+## Environment Workflow
+
+<Steps>
+  <Step title="Develop locally">
+    Build and test your pricing model in the development environment
+  </Step>
+  <Step title="Test in staging">
+    Validate end-to-end workflows with staging data
+  </Step>
+  <Step title="Deploy to production">
+    Roll out verified pricing changes to live customers
+  </Step>
+</Steps>
+
+## Data Scope
+
+All entities in FlexPrice are scoped to a tenant + environment:
+
+- Customers
+- Plans and prices
+- Meters and events
+- Subscriptions
+- Invoices
+- Wallets and credit grants
+
+<Warning>
+Moving data between environments requires export and import. There is no automatic sync.
+</Warning>
+
+## Best Practices
+
+1. **Use development for experiments** - Test new pricing models without affecting production
+2. **Stage before production** - Always validate in staging before deploying pricing changes
+3. **Separate API keys** - Use different keys for each environment
+4. **Monitor all environments** - Set up alerts for all environments, not just production
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/api/authentication">
+    Learn about API keys and environment scoping
+  </Card>
+  <Card title="Self-Hosting" href="/self-hosting/installation">
+    Deploy FlexPrice with multi-tenant support
+  </Card>
+</CardGroup>

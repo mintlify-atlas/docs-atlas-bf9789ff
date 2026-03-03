@@ -1,0 +1,278 @@
+---
+title: "List Customers"
+api: "GET /v1/customers"
+description: "Retrieve a paginated list of customers"
+---
+
+Use this endpoint when listing or searching customers (e.g., admin CRM or reporting). Returns a paginated list with support for filtering and sorting.
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default={50}>
+  The number of customers to return per page. Must be between 1 and 1000.
+</ParamField>
+
+<ParamField query="offset" type="integer" default={0}>
+  The number of customers to skip before starting to return results. Used for pagination.
+</ParamField>
+
+<ParamField query="sort" type="string" default="created_at">
+  The field to sort by (e.g., `created_at`, `name`, `email`).
+</ParamField>
+
+<ParamField query="order" type="string" default="desc">
+  The sort order. Must be either `asc` (ascending) or `desc` (descending).
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by customer status (e.g., `published`, `draft`, `archived`).
+</ParamField>
+
+<ParamField query="customer_ids" type="array">
+  Filter by specific customer IDs. Provide multiple IDs as comma-separated values.
+</ParamField>
+
+<ParamField query="external_ids" type="array">
+  Filter by external customer IDs. Provide multiple IDs as comma-separated values.
+</ParamField>
+
+<ParamField query="external_id" type="string">
+  Filter by a single external customer ID.
+</ParamField>
+
+<ParamField query="email" type="string">
+  Filter by customer email address.
+</ParamField>
+
+<ParamField query="parent_customer_ids" type="array">
+  Filter by parent customer IDs to retrieve child customers.
+</ParamField>
+
+<ParamField query="expand" type="string">
+  Expand related resources in the response (e.g., `parent_customer`).
+</ParamField>
+
+## Response
+
+<ResponseField name="items" type="array">
+  An array of customer objects.
+  
+  <Expandable title="Customer Object">
+    <ResponseField name="id" type="string">
+      The unique FlexPrice customer ID.
+    </ResponseField>
+    
+    <ResponseField name="external_id" type="string">
+      The external identifier from your system.
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The customer's name or company name.
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      The customer's email address.
+    </ResponseField>
+    
+    <ResponseField name="address_line1" type="string">
+      Primary address line.
+    </ResponseField>
+    
+    <ResponseField name="address_line2" type="string">
+      Secondary address line.
+    </ResponseField>
+    
+    <ResponseField name="address_city" type="string">
+      City name.
+    </ResponseField>
+    
+    <ResponseField name="address_state" type="string">
+      State or region name.
+    </ResponseField>
+    
+    <ResponseField name="address_postal_code" type="string">
+      Postal code.
+    </ResponseField>
+    
+    <ResponseField name="address_country" type="string">
+      Two-letter country code.
+    </ResponseField>
+    
+    <ResponseField name="parent_customer_id" type="string">
+      The parent customer ID if this is a child customer.
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object">
+      Custom metadata key-value pairs.
+    </ResponseField>
+    
+    <ResponseField name="environment_id" type="string">
+      The environment ID.
+    </ResponseField>
+    
+    <ResponseField name="tenant_id" type="string">
+      The tenant ID.
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      The customer status.
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp of creation.
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp of last update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination metadata.
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="total" type="integer">
+      The total number of customers matching the filter criteria.
+    </ResponseField>
+    
+    <ResponseField name="limit" type="integer">
+      The number of customers returned per page.
+    </ResponseField>
+    
+    <ResponseField name="offset" type="integer">
+      The offset for the next page of results.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.flexprice.io/v1/customers?limit=10&offset=0&order=desc" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash Filter by Email
+curl -X GET "https://api.flexprice.io/v1/customers?email=billing@acme.com" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash Filter by External ID
+curl -X GET "https://api.flexprice.io/v1/customers?external_id=user_12345" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.flexprice.io/v1/customers?limit=10&offset=0&order=desc',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY'
+    }
+  }
+);
+
+const { items, pagination } = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://api.flexprice.io/v1/customers',
+    headers={'Authorization': 'Bearer YOUR_API_KEY'},
+    params={'limit': 10, 'offset': 0, 'order': 'desc'}
+)
+
+data = response.json()
+items = data['items']
+pagination = data['pagination']
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "items": [
+    {
+      "id": "cust_abc123xyz789",
+      "external_id": "user_12345",
+      "name": "Acme Corporation",
+      "email": "billing@acme.com",
+      "address_line1": "123 Main Street",
+      "address_line2": "",
+      "address_city": "San Francisco",
+      "address_state": "CA",
+      "address_postal_code": "94105",
+      "address_country": "US",
+      "parent_customer_id": null,
+      "metadata": {
+        "plan_tier": "enterprise"
+      },
+      "environment_id": "env_prod_001",
+      "tenant_id": "tenant_001",
+      "status": "published",
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "cust_def456uvw012",
+      "external_id": "user_67890",
+      "name": "Tech Startup Inc",
+      "email": "admin@techstartup.com",
+      "address_line1": "456 Innovation Ave",
+      "address_line2": "Suite 200",
+      "address_city": "Austin",
+      "address_state": "TX",
+      "address_postal_code": "78701",
+      "address_country": "US",
+      "parent_customer_id": null,
+      "metadata": {
+        "plan_tier": "growth"
+      },
+      "environment_id": "env_prod_001",
+      "tenant_id": "tenant_001",
+      "status": "published",
+      "created_at": "2024-01-14T09:15:00Z",
+      "updated_at": "2024-01-14T09:15:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "limit": 10,
+    "offset": 0
+  }
+}
+```
+
+```json 400 - Bad Request
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Invalid filter parameters",
+    "hint": "limit must be between 1 and 1000"
+  }
+}
+```
+</ResponseExample>
+
+## Pagination
+
+The list endpoint supports cursor-based pagination using `limit` and `offset` parameters:
+
+1. **First Page**: Set `limit` to the desired page size (default: 50) and `offset` to 0
+2. **Next Pages**: Increment `offset` by `limit` for each subsequent page
+3. **Check Total**: Use `pagination.total` to determine if more pages exist
+
+**Example pagination flow:**
+
+```bash
+# Page 1: Get first 50 customers
+curl "https://api.flexprice.io/v1/customers?limit=50&offset=0"
+
+# Page 2: Get next 50 customers
+curl "https://api.flexprice.io/v1/customers?limit=50&offset=50"
+
+# Page 3: Get next 50 customers
+curl "https://api.flexprice.io/v1/customers?limit=50&offset=100"
+```

@@ -1,0 +1,242 @@
+---
+title: Installation
+description: Install and set up FlexPrice for self-hosting
+---
+
+FlexPrice can be installed using Docker Compose for quick setup or directly from source for development.
+
+## Prerequisites
+
+Before installing FlexPrice, ensure you have the following installed:
+
+- [Golang](https://go.dev/) 1.23+
+- [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/)
+- Supported platforms:
+  - Linux-based environment
+  - macOS (Darwin)
+  - WSL under Windows
+
+## Quick Setup with Docker Compose
+
+The fastest way to get FlexPrice running is using the automated Docker Compose setup:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/flexprice/flexprice
+    cd flexprice
+    ```
+  </Step>
+
+  <Step title="Run the setup script">
+    ```bash
+    make dev-setup
+    ```
+
+    This command will:
+    - Start all required infrastructure (PostgreSQL, Kafka, ClickHouse, Temporal)
+    - Build the FlexPrice application image
+    - Run database migrations and initialize Kafka topics
+    - Start all FlexPrice services (API, Consumer, Worker)
+  </Step>
+
+  <Step title="Verify the installation">
+    Once setup is complete, verify the services are running:
+
+    ```bash
+    docker compose ps
+    ```
+
+    You should see all services in a healthy state.
+  </Step>
+</Steps>
+
+## Accessing Services
+
+Once installation is complete, you can access:
+
+- **FlexPrice API**: http://localhost:8080
+- **Temporal UI**: http://localhost:8088
+- **Kafka UI**: http://localhost:8084 (with profile 'dev')
+- **ClickHouse UI**: http://localhost:8123
+
+<Note>
+The API base URL for SDK configuration should include `/v1`: `http://localhost:8080/v1`
+</Note>
+
+## Manual Installation
+
+For development or custom setups, you can install FlexPrice components individually.
+
+### Start Infrastructure Services
+
+Start only the required infrastructure without the FlexPrice application:
+
+```bash
+docker compose up -d postgres kafka clickhouse temporal temporal-ui
+```
+
+### Initialize Databases
+
+<Steps>
+  <Step title="Run PostgreSQL migrations">
+    ```bash
+    make migrate-postgres
+    ```
+  </Step>
+
+  <Step title="Run ClickHouse migrations">
+    ```bash
+    make migrate-clickhouse
+    ```
+  </Step>
+
+  <Step title="Generate and apply Ent migrations">
+    ```bash
+    make generate-ent
+    make migrate-ent
+    ```
+  </Step>
+</Steps>
+
+### Initialize Kafka Topics
+
+Create the required Kafka topics:
+
+```bash
+make init-kafka
+```
+
+### Build and Run
+
+<CodeGroup>
+```bash Docker
+# Build the FlexPrice image
+make build-image
+
+# Start FlexPrice services
+make start-flexprice
+```
+
+```bash Local Binary
+# Run the application locally
+go run cmd/server/main.go
+```
+</CodeGroup>
+
+## Development Credentials
+
+The default Docker Compose setup uses these credentials:
+
+### PostgreSQL
+
+```
+Host: localhost
+Port: 5432
+Database: flexprice
+Username: flexprice
+Password: flexprice123
+```
+
+### ClickHouse
+
+```
+Host: localhost
+Port: 9000 (native), 8123 (HTTP)
+Database: flexprice
+Username: flexprice
+Password: flexprice123
+```
+
+### Kafka
+
+```
+Bootstrap Server: localhost:29092
+UI: http://localhost:8084 (with --profile dev)
+```
+
+### API Authentication
+
+The default development API key is:
+
+```
+API Key: 0cc505d7b917e0b1f25ccbea029dd43f4002edfea46b7f941f281911246768fe
+Header: x-api-key
+```
+
+<Warning>
+These credentials are for development only. Never use them in production environments.
+</Warning>
+
+## Useful Commands
+
+Common commands for managing your FlexPrice installation:
+
+```bash
+# Restart only FlexPrice services (not infrastructure)
+make restart-flexprice
+
+# Stop all services
+make down
+
+# Clean everything and start fresh
+make clean-start
+
+# View logs for specific services
+docker compose logs -f flexprice-api
+docker compose logs -f flexprice-consumer
+docker compose logs -f flexprice-worker
+```
+
+## Optional: Kafka UI
+
+To enable the Kafka UI for easier topic management:
+
+```bash
+docker compose --profile dev up -d kafka-ui
+```
+
+Access it at http://localhost:8084
+
+## Next Steps
+
+- [Configure FlexPrice](/self-hosting/configuration) for your environment
+- [Choose a deployment mode](/self-hosting/deployment) for production
+- [Scale your deployment](/self-hosting/scaling) for high availability
+
+## Troubleshooting
+
+### Docker Issues
+
+1. Ensure Docker is running:
+   ```bash
+   docker info
+   ```
+
+2. Check container status:
+   ```bash
+   docker compose ps
+   ```
+
+3. View logs for a specific service:
+   ```bash
+   docker compose logs [service_name]
+   ```
+
+### Database Connection Issues
+
+Check if databases are healthy:
+
+```bash
+docker compose logs postgres
+docker compose logs clickhouse
+```
+
+### Kafka Issues
+
+Verify Kafka is running and list topics:
+
+```bash
+docker compose logs kafka
+docker compose exec kafka kafka-topics --bootstrap-server kafka:9092 --list
+```

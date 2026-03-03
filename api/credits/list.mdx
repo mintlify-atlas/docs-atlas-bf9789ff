@@ -1,0 +1,312 @@
+---
+title: "List Credit Grants"
+api: "GET /v1/credit-grants"
+description: "Retrieve a list of credit grants with optional filtering by scope, plan, or subscription."
+---
+
+## Query Parameters
+
+<ParamField query="scope" type="string">
+  Filter by scope
+  
+  **Values:** `PLAN`, `SUBSCRIPTION`
+</ParamField>
+
+<ParamField query="plan_id" type="string">
+  Filter by plan ID (only returns PLAN-scoped grants)
+</ParamField>
+
+<ParamField query="subscription_id" type="string">
+  Filter by subscription ID (only returns SUBSCRIPTION-scoped grants)
+</ParamField>
+
+<ParamField query="cadence" type="string">
+  Filter by cadence
+  
+  **Values:** `ONETIME`, `RECURRING`
+</ParamField>
+
+<ParamField query="expiration_type" type="string">
+  Filter by expiration type
+  
+  **Values:** `NEVER`, `DURATION`, `BILLING_CYCLE`
+</ParamField>
+
+<ParamField query="limit" type="integer" default="10">
+  Number of credit grants to return per page (max 100)
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of credit grants to skip for pagination
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="created_at">
+  Field to sort by
+  
+  **Values:** `created_at`, `updated_at`, `name`, `credits`
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="desc">
+  Sort order
+  
+  **Values:** `asc`, `desc`
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of credit grant objects
+  
+  <Expandable title="Credit grant object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the credit grant
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Name of the credit grant
+    </ResponseField>
+    
+    <ResponseField name="scope" type="string">
+      Scope of the grant (PLAN or SUBSCRIPTION)
+    </ResponseField>
+    
+    <ResponseField name="plan_id" type="string">
+      ID of the plan (if scope is PLAN)
+    </ResponseField>
+    
+    <ResponseField name="subscription_id" type="string">
+      ID of the subscription (if scope is SUBSCRIPTION)
+    </ResponseField>
+    
+    <ResponseField name="credits" type="string">
+      Number of credits granted
+    </ResponseField>
+    
+    <ResponseField name="cadence" type="string">
+      Cadence of the grant (ONETIME or RECURRING)
+    </ResponseField>
+    
+    <ResponseField name="period" type="string">
+      Period for recurring grants (DAILY, WEEKLY, MONTHLY, etc.)
+    </ResponseField>
+    
+    <ResponseField name="period_count" type="integer">
+      Number of periods for recurring grants
+    </ResponseField>
+    
+    <ResponseField name="expiration_type" type="string">
+      How credits expire (NEVER, DURATION, or BILLING_CYCLE)
+    </ResponseField>
+    
+    <ResponseField name="expiration_duration" type="integer">
+      Duration before expiration (if expiration_type is DURATION)
+    </ResponseField>
+    
+    <ResponseField name="expiration_duration_unit" type="string">
+      Unit for expiration duration (DAYS, WEEKS, MONTHS, YEARS)
+    </ResponseField>
+    
+    <ResponseField name="start_date" type="string">
+      Start date for the grant (subscription-scoped only)
+    </ResponseField>
+    
+    <ResponseField name="end_date" type="string">
+      End date for the grant (subscription-scoped only)
+    </ResponseField>
+    
+    <ResponseField name="conversion_rate" type="string">
+      Conversion rate from credits to currency
+    </ResponseField>
+    
+    <ResponseField name="topup_conversion_rate" type="string">
+      Conversion rate for top-ups
+    </ResponseField>
+    
+    <ResponseField name="priority" type="integer">
+      Priority for credit consumption
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object">
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      Timestamp when grant was created
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      Timestamp when grant was last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of credit grants matching the filter criteria
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  Number of credit grants returned per page
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Number of credit grants skipped
+</ResponseField>
+
+<RequestExample>
+```bash cURL - List all credit grants
+curl -X GET "https://api.flexprice.io/v1/credit-grants?limit=20" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - List grants for a specific subscription
+curl -X GET "https://api.flexprice.io/v1/credit-grants?subscription_id=sub_1234" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - List plan-scoped grants
+curl -X GET "https://api.flexprice.io/v1/credit-grants?scope=PLAN&plan_id=plan_enterprise" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+# List all credit grants
+grants = client.credit_grants.list(limit=20)
+
+# List grants for a specific subscription
+grants = client.credit_grants.list(subscription_id="sub_1234")
+
+# List plan-scoped grants
+grants = client.credit_grants.list(
+    scope="PLAN",
+    plan_id="plan_enterprise"
+)
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+// List all credit grants
+const grants = await client.creditGrants.list({ limit: 20 });
+
+// List grants for a specific subscription
+const grants = await client.creditGrants.list({
+  subscriptionId: "sub_1234"
+});
+
+// List plan-scoped grants
+const grants = await client.creditGrants.list({
+  scope: "PLAN",
+  planId: "plan_enterprise"
+});
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+// List all credit grants
+grants, err := client.CreditGrants.List(context.Background(), &flexprice.CreditGrantListParams{
+    Limit: 20,
+})
+
+// List grants for a specific subscription
+grants, err := client.CreditGrants.List(context.Background(), &flexprice.CreditGrantListParams{
+    SubscriptionID: "sub_1234",
+})
+
+// List plan-scoped grants
+grants, err := client.CreditGrants.List(context.Background(), &flexprice.CreditGrantListParams{
+    Scope: "PLAN",
+    PlanID: "plan_enterprise",
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "data": [
+    {
+      "id": "cg_abc123xyz",
+      "name": "Welcome Bonus",
+      "scope": "SUBSCRIPTION",
+      "subscription_id": "sub_1234",
+      "credits": "100.00000000",
+      "cadence": "ONETIME",
+      "expiration_type": "DURATION",
+      "expiration_duration": 30,
+      "expiration_duration_unit": "DAYS",
+      "start_date": "2024-01-15T00:00:00Z",
+      "conversion_rate": "1.00000",
+      "priority": 1,
+      "metadata": {
+        "campaign": "new_user_2024"
+      },
+      "created_at": "2024-01-15T10:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
+    },
+    {
+      "id": "cg_def456uvw",
+      "name": "Monthly Plan Credits",
+      "scope": "PLAN",
+      "plan_id": "plan_enterprise",
+      "credits": "500.00000000",
+      "cadence": "RECURRING",
+      "period": "MONTHLY",
+      "period_count": 12,
+      "expiration_type": "BILLING_CYCLE",
+      "conversion_rate": "1.00000",
+      "metadata": {},
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "total": 2,
+  "limit": 20,
+  "offset": 0
+}
+```
+</ResponseExample>
+
+## Common Filtering Patterns
+
+<AccordionGroup>
+  <Accordion title="View All Credits for a Customer">
+    To see all credits available to a customer, you need to query both:
+    1. Plan-scoped grants for any active subscriptions
+    2. Subscription-scoped grants for their specific subscriptions
+    
+    ```python
+    # Get customer's subscriptions
+    subscriptions = client.subscriptions.list(customer_id="cust_123")
+    
+    # Get subscription-scoped grants
+    for sub in subscriptions.data:
+        grants = client.credit_grants.list(subscription_id=sub.id)
+        
+    # Get plan-scoped grants
+    for sub in subscriptions.data:
+        grants = client.credit_grants.list(
+            scope="PLAN",
+            plan_id=sub.plan_id
+        )
+    ```
+  </Accordion>
+  
+  <Accordion title="Audit Recurring Credits">
+    List all recurring credit grants to understand ongoing commitments:
+    
+    ```bash
+    curl -X GET "https://api.flexprice.io/v1/credit-grants?cadence=RECURRING" \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+  </Accordion>
+  
+  <Accordion title="Find Expiring Credits">
+    While the list endpoint doesn't directly filter by expiration date, you can:
+    1. List all grants with `expiration_type=DURATION`
+    2. Filter by application date ranges in your application logic
+    3. Use the credit grant applications endpoint for scheduled credits
+  </Accordion>
+</AccordionGroup>

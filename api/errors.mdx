@@ -1,0 +1,550 @@
+---
+title: Error Handling
+description: Understanding FlexPrice API error codes and formats
+---
+
+The FlexPrice API uses conventional HTTP status codes and returns structured error responses to indicate the success or failure of requests.
+
+## Error Response Format
+
+All errors follow a consistent JSON structure:
+
+```json Standard Error Response
+{
+  "success": false,
+  "error": {
+    "message": "Human-readable error description",
+    "internal_error": "machine_readable_code",
+    "details": {
+      "field": "additional context"
+    }
+  }
+}
+```
+
+<ResponseField name="success" type="boolean">
+  Always `false` for error responses
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error details object
+  
+  <ResponseField name="message" type="string">
+    Human-readable error message describing what went wrong
+  </ResponseField>
+  
+  <ResponseField name="internal_error" type="string">
+    Machine-readable error code for programmatic handling
+  </ResponseField>
+  
+  <ResponseField name="details" type="object" optional>
+    Additional context about the error, such as validation failures or specific field errors
+  </ResponseField>
+</ResponseField>
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes to indicate request outcomes:
+
+### Success Codes
+
+<ResponseField name="200" type="OK">
+  Request succeeded. The response body contains the requested data.
+</ResponseField>
+
+<ResponseField name="201" type="Created">
+  Resource created successfully. The response contains the new resource.
+</ResponseField>
+
+<ResponseField name="204" type="No Content">
+  Request succeeded with no response body (typically for DELETE operations).
+</ResponseField>
+
+### Client Error Codes
+
+<ResponseField name="400" type="Bad Request">
+  Invalid request format, missing required fields, or validation errors.
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "Invalid email format",
+      "internal_error": "validation_error",
+      "details": {
+        "field": "email",
+        "value": "invalid-email"
+      }
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Missing or invalid authentication credentials.
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "API key required",
+      "internal_error": "permission_denied"
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+  Authentication succeeded but you don't have permission to access the resource.
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "Insufficient permissions to access this resource",
+      "internal_error": "permission_denied"
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="404" type="Not Found">
+  The requested resource doesn't exist.
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "Customer not found",
+      "internal_error": "not_found",
+      "details": {
+        "customer_id": "cus_invalid123"
+      }
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="409" type="Conflict">
+  Request conflicts with existing data (duplicate resources, version conflicts).
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "Customer with this external_id already exists",
+      "internal_error": "already_exists",
+      "details": {
+        "external_customer_id": "cus_123"
+      }
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="429" type="Too Many Requests">
+  Rate limit exceeded. Retry after the time specified in `Retry-After` header.
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "Rate limit exceeded",
+      "internal_error": "service_unavailable",
+      "details": {
+        "retry_after": 60
+      }
+    }
+  }
+  ```
+</ResponseField>
+
+### Server Error Codes
+
+<ResponseField name="500" type="Internal Server Error">
+  An unexpected error occurred on the server.
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "An internal error occurred",
+      "internal_error": "internal_error"
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="503" type="Service Unavailable">
+  Service is temporarily unavailable (maintenance, overload).
+  
+  ```json Example
+  {
+    "success": false,
+    "error": {
+      "message": "Service temporarily unavailable",
+      "internal_error": "service_unavailable"
+    }
+  }
+  ```
+</ResponseField>
+
+## Error Codes
+
+The `internal_error` field contains machine-readable error codes for programmatic handling:
+
+### Resource Errors
+
+<ParamField path="not_found" type="string">
+  Requested resource doesn't exist
+  
+  **HTTP Status:** 404
+</ParamField>
+
+<ParamField path="already_exists" type="string">
+  Resource with the same identifier already exists
+  
+  **HTTP Status:** 409
+</ParamField>
+
+<ParamField path="version_conflict" type="string">
+  Optimistic locking failure - resource was modified by another request
+  
+  **HTTP Status:** 409
+</ParamField>
+
+### Validation Errors
+
+<ParamField path="validation_error" type="string">
+  Request data failed validation (invalid format, missing required fields)
+  
+  **HTTP Status:** 400
+</ParamField>
+
+<ParamField path="invalid_operation" type="string">
+  Operation is not allowed in the current state
+  
+  **HTTP Status:** 400
+  
+  Example: Attempting to activate an already-active subscription
+</ParamField>
+
+### Authentication & Authorization
+
+<ParamField path="permission_denied" type="string">
+  Missing authentication or insufficient permissions
+  
+  **HTTP Status:** 401 or 403
+</ParamField>
+
+### System Errors
+
+<ParamField path="database_error" type="string">
+  Database operation failed
+  
+  **HTTP Status:** 500
+</ParamField>
+
+<ParamField path="http_client_error" type="string">
+  External HTTP request failed
+  
+  **HTTP Status:** 500
+</ParamField>
+
+<ParamField path="system_error" type="string">
+  General system error
+  
+  **HTTP Status:** 500
+</ParamField>
+
+<ParamField path="internal_error" type="string">
+  Unexpected internal error
+  
+  **HTTP Status:** 500
+</ParamField>
+
+<ParamField path="service_unavailable" type="string">
+  Service is temporarily unavailable
+  
+  **HTTP Status:** 503
+</ParamField>
+
+## Error Handling Examples
+
+### Handling Validation Errors
+
+<CodeGroup>
+```bash cURL
+curl -X POST http://localhost:8080/v1/customers \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_customer_id": "cus_123",
+    "email": "invalid-email"
+  }'
+
+# Response: 400 Bad Request
+{
+  "success": false,
+  "error": {
+    "message": "Invalid email format",
+    "internal_error": "validation_error",
+    "details": {
+      "field": "email"
+    }
+  }
+}
+```
+
+```python Python
+from flexprice import Flexprice
+from flexprice.exceptions import ValidationError
+
+client = Flexprice(api_key="your-api-key")
+
+try:
+    customer = client.customers.create(
+        external_customer_id="cus_123",
+        email="invalid-email"
+    )
+except ValidationError as e:
+    print(f"Validation failed: {e.message}")
+    print(f"Error code: {e.code}")
+    if e.details:
+        print(f"Field: {e.details.get('field')}")
+```
+
+```typescript TypeScript
+import { Flexprice, ValidationError } from '@flexprice/sdk';
+
+const client = new Flexprice({ apiKey: 'your-api-key' });
+
+try {
+  const customer = await client.customers.create({
+    externalCustomerId: 'cus_123',
+    email: 'invalid-email'
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.log(`Validation failed: ${error.message}`);
+    console.log(`Error code: ${error.code}`);
+    if (error.details) {
+      console.log(`Field: ${error.details.field}`);
+    }
+  }
+}
+```
+
+```go Go
+import (
+    "github.com/flexprice/go-sdk"
+    "github.com/flexprice/go-sdk/errors"
+)
+
+client := flexprice.New(flexprice.WithAPIKey("your-api-key"))
+
+customer, err := client.Customers.Create(ctx, &flexprice.CreateCustomerRequest{
+    ExternalCustomerID: "cus_123",
+    Email: "invalid-email",
+})
+
+if err != nil {
+    var validationErr *errors.ValidationError
+    if errors.As(err, &validationErr) {
+        fmt.Printf("Validation failed: %s\n", validationErr.Message)
+        fmt.Printf("Error code: %s\n", validationErr.Code)
+        if validationErr.Details != nil {
+            fmt.Printf("Field: %s\n", validationErr.Details["field"])
+        }
+    }
+}
+```
+</CodeGroup>
+
+### Handling Not Found Errors
+
+```bash Check Before Deleting
+# First, check if resource exists
+curl -X GET http://localhost:8080/v1/customers/cus_abc123 \
+  -H "X-API-Key: your-api-key"
+
+# If 404, handle gracefully
+# Response: 404 Not Found
+{
+  "success": false,
+  "error": {
+    "message": "Customer not found",
+    "internal_error": "not_found"
+  }
+}
+```
+
+### Handling Conflict Errors
+
+```bash Retry with Different ID
+# Attempt to create customer
+curl -X POST http://localhost:8080/v1/customers \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_customer_id": "cus_123",
+    "name": "Acme Corp"
+  }'
+
+# If 409, customer already exists
+# Response: 409 Conflict
+{
+  "success": false,
+  "error": {
+    "message": "Customer with this external_id already exists",
+    "internal_error": "already_exists",
+    "details": {
+      "external_customer_id": "cus_123"
+    }
+  }
+}
+
+# Option 1: Fetch existing customer
+curl -X GET http://localhost:8080/v1/customers/external/cus_123 \
+  -H "X-API-Key: your-api-key"
+
+# Option 2: Update existing customer
+curl -X PUT http://localhost:8080/v1/customers?external_customer_id=cus_123 \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme Corp Updated"}'
+```
+
+### Handling Rate Limits
+
+```bash Exponential Backoff
+# Request that exceeds rate limit
+curl -X POST http://localhost:8080/v1/events/bulk \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"events": [...]}'
+
+# Response: 429 Too Many Requests
+# Retry-After: 60
+{
+  "success": false,
+  "error": {
+    "message": "Rate limit exceeded",
+    "internal_error": "service_unavailable"
+  }
+}
+
+# Wait for Retry-After seconds and retry
+sleep 60
+curl -X POST http://localhost:8080/v1/events/bulk \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"events": [...]}'
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Check error codes programmatically">
+    Use the `internal_error` field to handle specific error types in your code rather than parsing error messages.
+  </Step>
+  
+  <Step title="Implement retry logic">
+    For `500` and `503` errors, implement exponential backoff retry logic. For `429` errors, respect the `Retry-After` header.
+  </Step>
+  
+  <Step title="Log error details">
+    Include the full error response in your logs, including the `details` object, to help with debugging.
+  </Step>
+  
+  <Step title="Handle validation errors gracefully">
+    For `validation_error` responses, display user-friendly messages and highlight specific fields that need correction.
+  </Step>
+  
+  <Step title="Monitor error rates">
+    Track error rates by status code and error type to identify integration issues early.
+  </Step>
+</Steps>
+
+## Common Error Scenarios
+
+### Duplicate Customer Creation
+
+```json Request
+POST /v1/customers
+{
+  "external_customer_id": "existing_customer",
+  "name": "Test Corp"
+}
+```
+
+```json Response: 409 Conflict
+{
+  "success": false,
+  "error": {
+    "message": "Customer with this external_id already exists",
+    "internal_error": "already_exists"
+  }
+}
+```
+
+**Solution:** Use `GET /v1/customers/external/{external_id}` to fetch the existing customer or `PUT` to update it.
+
+### Invalid Meter Reference
+
+```json Request
+POST /v1/events
+{
+  "event_name": "api_call",
+  "external_customer_id": "cus_123",
+  "meter_id": "invalid_meter"
+}
+```
+
+```json Response: 404 Not Found
+{
+  "success": false,
+  "error": {
+    "message": "Meter not found",
+    "internal_error": "not_found"
+  }
+}
+```
+
+**Solution:** Verify the meter exists using `GET /v1/meters` before ingesting events.
+
+### Missing Required Field
+
+```json Request
+POST /v1/subscriptions
+{
+  "customer_id": "cus_abc123"
+  // Missing required plan_id
+}
+```
+
+```json Response: 400 Bad Request
+{
+  "success": false,
+  "error": {
+    "message": "plan_id is required",
+    "internal_error": "validation_error",
+    "details": {
+      "field": "plan_id"
+    }
+  }
+}
+```
+
+**Solution:** Include all required fields as documented in the API reference.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn about API key authentication
+  </Card>
+  <Card title="Pagination" icon="list" href="/api/pagination">
+    Understand paginated responses
+  </Card>
+</CardGroup>

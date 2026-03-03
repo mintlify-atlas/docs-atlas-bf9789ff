@@ -1,0 +1,561 @@
+---
+title: Scaling
+description: Scale FlexPrice for high availability and performance
+---
+
+FlexPrice is designed to scale horizontally across all tiers. This guide covers scaling strategies for production workloads.
+
+## Scaling Overview
+
+FlexPrice scales at three independent tiers:
+
+```
+API Tier        → Horizontal scaling (stateless)
+Consumer Tier   → Partition-based scaling (Kafka)
+Worker Tier     → Task queue scaling (Temporal)
+```
+
+## API Tier Scaling
+
+The API tier is stateless and scales horizontally with a load balancer.
+
+### Horizontal Pod Autoscaling (Kubernetes)
+
+```yaml k8s/api-hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: flexprice-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: flexprice-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+```
+
+### Docker Compose Scaling
+
+```bash
+# Scale to 5 replicas
+docker compose up -d --scale flexprice-api=5
+
+# With resource limits
+docker compose up -d --scale flexprice-api=5 \
+  --cpus=2 --memory=2g
+```
+
+### Load Balancer Configuration
+
+<CodeGroup>
+```nginx Nginx
+upstream flexprice_api {
+    least_conn;  # Use least connections algorithm
+    
+    server flexprice-api-1:8080 max_fails=3 fail_timeout=30s;
+    server flexprice-api-2:8080 max_fails=3 fail_timeout=30s;
+    server flexprice-api-3:8080 max_fails=3 fail_timeout=30s;
+    
+    keepalive 32;  # Keep connections alive
+}
+
+server {
+    listen 80;
+    server_name api.flexprice.io;
+
+    location / {
+        proxy_pass http://flexprice_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
+        # Timeouts
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    location /health {
+        access_log off;
+        proxy_pass http://flexprice_api/health;
+    }
+}
+```
+
+```yaml HAProxy
+global
+    maxconn 4096
+
+defaults
+    mode http
+    timeout connect 5s
+    timeout client 30s
+    timeout server 30s
+
+frontend flexprice_front
+    bind *:80
+    default_backend flexprice_api
+
+backend flexprice_api
+    balance leastconn
+    option httpchk GET /health
+    
+    server api1 flexprice-api-1:8080 check inter 2s fall 3 rise 2
+    server api2 flexprice-api-2:8080 check inter 2s fall 3 rise 2
+    server api3 flexprice-api-3:8080 check inter 2s fall 3 rise 2
+```
+</CodeGroup>
+
+### Resource Recommendations
+
+| Load Level | vCPU | Memory | Replicas | Notes |
+|------------|------|--------|----------|--------|
+| Low (less than 100 req/s) | 1 | 1GB | 2-3 | Minimum for HA |
+| Medium (100-500 req/s) | 2 | 2GB | 3-5 | Baseline production |
+| High (500-2000 req/s) | 2-4 | 2-4GB | 5-10 | High traffic |
+| Very High (over 2000 req/s) | 4 | 4GB | 10-20+ | Enterprise scale |
+
+<Note>
+Always run at least 2 replicas for high availability, even during low traffic.
+</Note>
+
+## Consumer Tier Scaling
+
+Consumer scaling is tied to Kafka partition count - you can have at most one consumer per partition.
+
+### Partition Strategy
+
+<Steps>
+  <Step title="Calculate partition count">
+    Determine partitions based on peak event rate:
+
+    ```
+    Partitions = (Peak Events/sec) / (Events per Consumer/sec)
+    ```
+
+    Example: 10,000 events/sec ÷ 1,000 events/sec = 10 partitions
+  </Step>
+
+  <Step title="Create or increase partitions">
+    ```bash
+    # Increase partitions for events topic
+    docker compose exec kafka kafka-topics \
+      --bootstrap-server kafka:9092 \
+      --alter \
+      --topic events \
+      --partitions 10
+    ```
+
+    <Warning>
+    Partition count can only be increased, never decreased. Plan accordingly.
+    </Warning>
+  </Step>
+
+  <Step title="Scale consumers to match">
+    ```bash
+    # Docker Compose
+    docker compose up -d --scale flexprice-consumer=10
+
+    # Kubernetes
+    kubectl scale deployment flexprice-consumer --replicas=10
+    ```
+  </Step>
+</Steps>
+
+### Consumer Configuration
+
+Optimize consumer performance with rate limits:
+
+```yaml docker-compose.yml
+services:
+  flexprice-consumer:
+    image: flexprice-app:latest
+    environment:
+      - FLEXPRICE_DEPLOYMENT_MODE=consumer
+      # Rate limits (messages per second)
+      - FLEXPRICE_EVENT_PROCESSING_RATE_LIMIT=100
+      - FLEXPRICE_FEATURE_USAGE_TRACKING_RATE_LIMIT=50
+      - FLEXPRICE_EVENT_POST_PROCESSING_RATE_LIMIT=75
+    deploy:
+      replicas: 5
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+```
+
+### Consumer Group Strategy
+
+FlexPrice uses multiple consumer groups for different processing stages:
+
+```
+events topic (10 partitions)
+    │
+    ├─→ v1_event_processing (5 consumers) → Store in ClickHouse
+    ├─→ v1_feature_tracking_service (3 consumers) → Track features
+    └─→ v1_costsheet_usage_tracking_service (2 consumers) → Calculate costs
+```
+
+Each consumer group processes independently - scale them based on their specific load.
+
+### Partition Monitoring
+
+Monitor consumer lag to identify scaling needs:
+
+```bash
+# Check consumer group lag
+docker compose exec kafka kafka-consumer-groups \
+  --bootstrap-server kafka:9092 \
+  --describe \
+  --group v1_event_processing
+```
+
+Output:
+```
+GROUP                 TOPIC     PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
+v1_event_processing   events    0          1000           1000            0
+v1_event_processing   events    1          950            1020            70
+```
+
+If LAG is consistently high, add more partitions and consumers.
+
+### Resource Recommendations
+
+| Event Rate | vCPU | Memory | Partitions | Consumers | Notes |
+|------------|------|--------|------------|-----------|--------|
+| Under 1K/s | 1 | 1GB | 3 | 2-3 | Small workload |
+| 1K-10K/s | 2 | 2GB | 10 | 5-10 | Medium workload |
+| 10K-50K/s | 2-4 | 2-4GB | 20 | 10-20 | High workload |
+| Over 50K/s | 4 | 4GB | 50+ | 30-50 | Enterprise scale |
+
+## Worker Tier Scaling
+
+Temporal workers scale based on workflow concurrency.
+
+### Kubernetes Deployment
+
+```yaml k8s/worker-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flexprice-worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: flexprice
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: flexprice
+        component: worker
+    spec:
+      containers:
+      - name: flexprice
+        image: flexprice-app:latest
+        env:
+        - name: FLEXPRICE_DEPLOYMENT_MODE
+          value: "temporal_worker"
+        - name: FLEXPRICE_TEMPORAL_ADDRESS
+          value: "temporal:7233"
+        - name: FLEXPRICE_TEMPORAL_TASK_QUEUE
+          value: "billing-task-queue"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+```
+
+### Task Queue Strategy
+
+Use multiple task queues for different workflow priorities:
+
+```
+Workflows
+    │
+    ├─→ billing-high-priority (5 workers) → Critical billing
+    ├─→ billing-standard (3 workers) → Regular billing
+    └─→ billing-background (2 workers) → Batch operations
+```
+
+### Worker Monitoring
+
+Monitor workflow execution in Temporal UI:
+
+- **Queue depth**: Number of pending workflows
+- **Execution time**: Average workflow duration
+- **Worker utilization**: Active workers / Total workers
+
+Scale workers when queue depth remains high.
+
+### Resource Recommendations
+
+| Workflow Concurrency | vCPU | Memory | Workers | Notes |
+|---------------------|------|--------|---------|--------|
+| Under 100 | 1 | 1GB | 2 | Small workload |
+| 100-500 | 2 | 2GB | 3-5 | Medium workload |
+| 500-2000 | 2 | 2GB | 5-10 | High workload |
+| Over 2000 | 2-4 | 2-4GB | 10-20 | Enterprise scale |
+
+## Database Scaling
+
+### PostgreSQL
+
+For high-traffic deployments, use read replicas:
+
+```yaml config.yaml
+postgres:
+  host: postgres-primary.example.com
+  port: 5432
+  # Read replica configuration
+  reader_host: postgres-replica.example.com
+  reader_port: 5432
+  # Connection pooling
+  max_open_conns: 25
+  max_idle_conns: 10
+  conn_max_lifetime_minutes: 60
+```
+
+```bash Environment Variables
+FLEXPRICE_POSTGRES_HOST=postgres-primary
+FLEXPRICE_POSTGRES_READER_HOST=postgres-replica
+FLEXPRICE_POSTGRES_MAX_OPEN_CONNS=25
+```
+
+### ClickHouse
+
+ClickHouse scales by adding cluster nodes:
+
+```xml clickhouse-config.xml
+<clickhouse>
+    <remote_servers>
+        <flexprice_cluster>
+            <shard>
+                <replica>
+                    <host>clickhouse-1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>clickhouse-2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </flexprice_cluster>
+    </remote_servers>
+</clickhouse>
+```
+
+## Kafka Scaling
+
+For high-throughput event processing:
+
+### Kafka Cluster
+
+```yaml docker-compose.yml
+services:
+  kafka-1:
+    image: confluentinc/cp-kafka:7.7.1
+    environment:
+      KAFKA_BROKER_ID: 1
+      # ... kafka config
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.7.1
+    environment:
+      KAFKA_BROKER_ID: 2
+      # ... kafka config
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.7.1
+    environment:
+      KAFKA_BROKER_ID: 3
+      # ... kafka config
+```
+
+### Replication Factor
+
+Increase replication for durability:
+
+```bash
+docker compose exec kafka kafka-topics \
+  --bootstrap-server kafka:9092 \
+  --create \
+  --topic events \
+  --partitions 10 \
+  --replication-factor 3 \
+  --config min.insync.replicas=2
+```
+
+## Redis Scaling
+
+For distributed caching:
+
+```yaml redis-cluster.yml
+services:
+  redis-master:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  redis-replica-1:
+    image: redis:7-alpine
+    command: redis-server --replicaof redis-master 6379
+
+  redis-replica-2:
+    image: redis:7-alpine
+    command: redis-server --replicaof redis-master 6379
+```
+
+```bash
+FLEXPRICE_REDIS_HOST=redis-master
+FLEXPRICE_REDIS_PORT=6379
+FLEXPRICE_REDIS_POOL_SIZE=20
+```
+
+## Complete Production Example
+
+Full production deployment with all scaling considerations:
+
+```yaml docker-compose.prod.yml
+services:
+  # Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - flexprice-api
+
+  # API Tier (horizontally scaled)
+  flexprice-api:
+    image: flexprice-app:latest
+    environment:
+      - FLEXPRICE_DEPLOYMENT_MODE=api
+      - FLEXPRICE_POSTGRES_HOST=postgres-primary
+      - FLEXPRICE_POSTGRES_READER_HOST=postgres-replica
+      - FLEXPRICE_KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+      - FLEXPRICE_REDIS_HOST=redis
+      - FLEXPRICE_POSTGRES_MAX_OPEN_CONNS=25
+    deploy:
+      replicas: 5
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  # Consumer Tier (partition-scaled)
+  flexprice-consumer:
+    image: flexprice-app:latest
+    environment:
+      - FLEXPRICE_DEPLOYMENT_MODE=consumer
+      - FLEXPRICE_POSTGRES_HOST=postgres-primary
+      - FLEXPRICE_KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+      - FLEXPRICE_EVENT_PROCESSING_RATE_LIMIT=100
+      - FLEXPRICE_FEATURE_USAGE_TRACKING_RATE_LIMIT=50
+    deploy:
+      replicas: 10
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # Worker Tier (workflow-scaled)
+  flexprice-worker:
+    image: flexprice-app:latest
+    environment:
+      - FLEXPRICE_DEPLOYMENT_MODE=temporal_worker
+      - FLEXPRICE_POSTGRES_HOST=postgres-primary
+      - FLEXPRICE_TEMPORAL_ADDRESS=temporal:7233
+    deploy:
+      replicas: 5
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+```
+
+## Monitoring Scaling Metrics
+
+Key metrics to monitor:
+
+### API Tier
+- Request rate (requests/second)
+- Response latency (p50, p95, p99)
+- Error rate (%)
+- CPU and memory utilization
+
+### Consumer Tier
+- Consumer lag (messages)
+- Processing rate (events/second)
+- Error rate (%)
+- CPU and memory utilization
+
+### Worker Tier
+- Workflow queue depth
+- Average workflow duration
+- Worker utilization (%)
+- CPU and memory utilization
+
+### Infrastructure
+- Database connection pool usage
+- Kafka partition distribution
+- Redis cache hit rate
+- Network throughput
+
+## Scaling Decision Matrix
+
+| Symptom | Possible Cause | Solution |
+|---------|---------------|----------|
+| High API latency | Too few API replicas | Scale API tier horizontally |
+| High consumer lag | Too few partitions | Increase Kafka partitions |
+| Queue depth growing | Too few workers | Scale worker tier |
+| Database slow queries | Connection limit | Increase max_open_conns |
+| High memory usage | Large payloads | Increase memory limits |
+| Network saturation | High throughput | Add more nodes |
+
+## Next Steps
+
+- [Set up monitoring](/observability/overview)
+- [Configure alerts](/observability/alerting)
+- [Review deployment modes](/self-hosting/deployment)

@@ -1,0 +1,122 @@
+---
+title: "Delete Customer"
+api: "DELETE /v1/customers/{id}"
+description: "Delete a customer from FlexPrice"
+---
+
+Use this endpoint when removing a customer (e.g., GDPR compliance or customer churn). Returns 204 No Content on success.
+
+<Warning>
+  Deleting a customer is a permanent action. Consider archiving the customer by updating its status instead if you need to retain historical data.
+</Warning>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique FlexPrice customer ID (e.g., `cust_abc123xyz789`).
+</ParamField>
+
+## Response
+
+On successful deletion, this endpoint returns a `204 No Content` response with an empty body.
+
+<RequestExample>
+```bash cURL
+curl -X DELETE https://api.flexprice.io/v1/customers/cust_abc123xyz789 \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.flexprice.io/v1/customers/cust_abc123xyz789',
+  {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY'
+    }
+  }
+);
+
+if (response.status === 204) {
+  console.log('Customer deleted successfully');
+}
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    'https://api.flexprice.io/v1/customers/cust_abc123xyz789',
+    headers={'Authorization': 'Bearer YOUR_API_KEY'}
+)
+
+if response.status_code == 204:
+    print('Customer deleted successfully')
+```
+</RequestExample>
+
+<ResponseExample>
+```text 204 - No Content
+(Empty response body)
+```
+
+```json 404 - Not Found
+{
+  "error": {
+    "code": "not_found",
+    "message": "Customer not found",
+    "hint": "The customer ID provided does not exist or has already been deleted"
+  }
+}
+```
+
+```json 400 - Bad Request
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Cannot delete customer with active subscriptions",
+    "hint": "Please cancel all active subscriptions before deleting the customer"
+  }
+}
+```
+</ResponseExample>
+
+## Important Considerations
+
+### Data Retention
+
+When a customer is deleted:
+
+- The customer record is permanently removed from the system
+- Associated subscriptions may be canceled (depending on your configuration)
+- Historical invoices and usage data may be retained for compliance purposes
+- The operation cannot be undone
+
+### Alternative: Archiving
+
+If you need to deactivate a customer but preserve historical data, consider updating the customer's status to `archived` instead:
+
+```bash
+curl -X PUT https://api.flexprice.io/v1/customers/cust_abc123xyz789 \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "archived"}'
+```
+
+### GDPR Compliance
+
+If you're deleting a customer for GDPR or data privacy compliance:
+
+1. Ensure all related personal data is also removed
+2. Consider using the deletion to trigger cleanup of related records
+3. Maintain deletion logs for audit purposes
+4. Verify that any third-party integrations (Stripe, PayPal, etc.) are also notified
+
+### Cascade Effects
+
+Before deleting a customer, ensure:
+
+- All active subscriptions are canceled
+- Outstanding invoices are resolved
+- Any scheduled workflows or tasks are stopped
+- Dependent child customers (if any) are handled appropriately

@@ -1,0 +1,117 @@
+---
+title: SDK Overview
+description: Choose the right FlexPrice SDK for your stack
+---
+
+FlexPrice provides native SDKs for Go, Python, and TypeScript/JavaScript, plus an MCP server for AI assistants. All SDKs are generated from the same OpenAPI spec, ensuring consistency across languages.
+
+## Available SDKs
+
+<CardGroup cols={2}>
+  <Card title="Go SDK" icon="golang" href="/sdks/go">
+    Type-safe Go client with async batching support
+  </Card>
+  <Card title="Python SDK" icon="python" href="/sdks/python">
+    Sync and async Python client with Pydantic models
+  </Card>
+  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript">
+    ESM and CommonJS support with full TypeScript types
+  </Card>
+  <Card title="MCP Server" icon="robot" href="/sdks/mcp">
+    Model Context Protocol server for AI assistants
+  </Card>
+</CardGroup>
+
+## Quick Comparison
+
+| Feature | Go | Python | TypeScript | MCP |
+|---------|----|----|----|---------|
+| **Package** | `github.com/flexprice/flexprice-go/v2` | `flexprice` | `@flexprice/sdk` | `@flexprice/mcp-server` |
+| **Min Version** | Go 1.20+ | Python 3.10+ | Node.js 18+ | Node.js 20+ |
+| **Async Support** | ✓ (Batching) | ✓ (Native) | ✓ (Promise-based) | N/A |
+| **Type Safety** | ✓ | ✓ (Pydantic) | ✓ (TypeScript) | ✓ |
+| **Install Command** | `go get` | `pip install` | `npm install` | `npx` |
+| **Best For** | Backend services, high-volume events | Django/Flask apps, data pipelines | Node.js APIs, Next.js apps | AI assistants, IDE integrations |
+
+## Installation
+
+<CodeGroup>
+```bash Go
+go get github.com/flexprice/flexprice-go/v2
+```
+
+```bash Python
+pip install flexprice
+```
+
+```bash TypeScript
+npm install @flexprice/sdk
+```
+
+```bash MCP Server
+npx @flexprice/mcp-server start \
+  --server-url https://us.api.flexprice.io/v1 \
+  --api-key-auth YOUR_API_KEY
+```
+</CodeGroup>
+
+## Common Features
+
+All SDKs provide:
+
+- **Full API coverage** – Customers, plans, events, invoices, payments, entitlements, and more
+- **Type-safe models** – Request and response types generated from OpenAPI spec
+- **Built-in retries** – Automatic retry logic with exponential backoff
+- **Error handling** – Structured error responses with status codes
+- **Authentication** – Simple API key authentication via `x-api-key` header
+
+## Base URL Configuration
+
+<Warning>
+  Always include `/v1` in your base URL. Example: `https://us.api.flexprice.io/v1`
+  
+  - ✅ Correct: `https://us.api.flexprice.io/v1`
+  - ❌ Wrong: `https://us.api.flexprice.io` (missing `/v1`)
+  - ❌ Wrong: `https://us.api.flexprice.io/v1/` (trailing slash)
+</Warning>
+
+## Authentication
+
+All SDKs use API key authentication:
+
+<Steps>
+  <Step title="Get your API key">
+    Retrieve your API key from the [FlexPrice dashboard](https://app.flexprice.io)
+  </Step>
+  
+  <Step title="Store securely">
+    Use environment variables (e.g., `FLEXPRICE_API_KEY`) – never hardcode keys
+  </Step>
+  
+  <Step title="Initialize SDK">
+    Pass the API key when creating the client (see language-specific guides)
+  </Step>
+</Steps>
+
+<Note>
+  API keys are for server-side use only. Never expose them in client-side code or public repositories.
+</Note>
+
+## Next Steps
+
+Choose your language to get started:
+
+<CardGroup cols={2}>
+  <Card title="Go SDK Guide" icon="golang" href="/sdks/go">
+    Go installation, initialization, and examples
+  </Card>
+  <Card title="Python SDK Guide" icon="python" href="/sdks/python">
+    Python setup with sync and async examples
+  </Card>
+  <Card title="TypeScript SDK Guide" icon="js" href="/sdks/typescript">
+    TypeScript/JavaScript integration guide
+  </Card>
+  <Card title="MCP Server Guide" icon="robot" href="/sdks/mcp">
+    Set up FlexPrice in Claude, Cursor, or VS Code
+  </Card>
+</CardGroup>

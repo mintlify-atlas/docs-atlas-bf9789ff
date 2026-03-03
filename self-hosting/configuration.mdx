@@ -1,0 +1,410 @@
+---
+title: Configuration
+description: Configure FlexPrice for your environment
+---
+
+FlexPrice uses a flexible configuration system that supports YAML files and environment variables.
+
+## Configuration Sources
+
+Configuration is loaded in the following order (later sources override earlier ones):
+
+1. `internal/config/config.yaml` - Default configuration
+2. `.env` file - Environment-specific overrides
+3. Environment variables - Runtime overrides
+
+All environment variables use the `FLEXPRICE_` prefix. Nested configuration keys use underscores:
+
+```bash
+FLEXPRICE_POSTGRES_HOST=postgres
+FLEXPRICE_KAFKA_BROKERS=kafka:9092
+FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+```
+
+## Core Configuration
+
+### Deployment Mode
+
+Controls which services run in the process:
+
+```yaml config.yaml
+deployment:
+  mode: "local"  # local, api, consumer, temporal_worker
+```
+
+```bash Environment Variable
+FLEXPRICE_DEPLOYMENT_MODE=api
+```
+
+See [Deployment Modes](/self-hosting/deployment) for details on each mode.
+
+### Server Configuration
+
+```yaml config.yaml
+server:
+  address: ":8080"
+```
+
+```bash Environment Variable
+FLEXPRICE_SERVER_ADDRESS=:8080
+```
+
+## Database Configuration
+
+### PostgreSQL
+
+FlexPrice uses PostgreSQL for transactional data:
+
+```yaml config.yaml
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: flexprice
+  password: flexprice123
+  dbname: flexprice
+  sslmode: disable
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime_minutes: 60
+  auto_migrate: false
+  # Optional: Read replica configuration
+  reader_host: 127.0.0.1
+  reader_port: 5432
+```
+
+<CodeGroup>
+```bash Environment Variables
+FLEXPRICE_POSTGRES_HOST=postgres
+FLEXPRICE_POSTGRES_PORT=5432
+FLEXPRICE_POSTGRES_USER=flexprice
+FLEXPRICE_POSTGRES_PASSWORD=your_secure_password
+FLEXPRICE_POSTGRES_DBNAME=flexprice
+FLEXPRICE_POSTGRES_SSLMODE=require
+FLEXPRICE_POSTGRES_MAX_OPEN_CONNS=25
+FLEXPRICE_POSTGRES_MAX_IDLE_CONNS=10
+```
+
+```bash Docker Compose
+environment:
+  - FLEXPRICE_POSTGRES_HOST=postgres
+  - FLEXPRICE_POSTGRES_PORT=5432
+```
+</CodeGroup>
+
+<Note>
+For production, set `sslmode` to `require` or `verify-full` and use strong passwords.
+</Note>
+
+### ClickHouse
+
+FlexPrice uses ClickHouse for analytics and event storage:
+
+```yaml config.yaml
+clickhouse:
+  address: 127.0.0.1:9000
+  tls: false
+  username: flexprice
+  password: flexprice123
+  database: flexprice
+```
+
+```bash Environment Variables
+FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+FLEXPRICE_CLICKHOUSE_TLS=true
+FLEXPRICE_CLICKHOUSE_USERNAME=flexprice
+FLEXPRICE_CLICKHOUSE_PASSWORD=your_secure_password
+FLEXPRICE_CLICKHOUSE_DATABASE=flexprice
+```
+
+## Message Queue Configuration
+
+### Kafka
+
+FlexPrice requires Kafka for event processing:
+
+```yaml config.yaml
+kafka:
+  brokers: "localhost:29092"
+  consumer_group: "flexprice-consumer-local"
+  topic: "events"
+  topic_lazy: "events_lazy"
+  topic_dlq: "events_dlq"
+  tls: false
+  use_sasl: false
+  sasl_mechanism: ""
+  sasl_user: ""
+  sasl_password: ""
+  client_id: "flexprice-client-local"
+  route_tenants_on_lazy_mode: []
+```
+
+<CodeGroup>
+```bash Local Development
+FLEXPRICE_KAFKA_BROKERS=localhost:29092
+FLEXPRICE_KAFKA_CONSUMER_GROUP=flexprice-consumer
+FLEXPRICE_KAFKA_TLS=false
+FLEXPRICE_KAFKA_USE_SASL=false
+```
+
+```bash Production with SASL
+FLEXPRICE_KAFKA_BROKERS=kafka-1:9094,kafka-2:9094,kafka-3:9094
+FLEXPRICE_KAFKA_TLS=true
+FLEXPRICE_KAFKA_USE_SASL=true
+FLEXPRICE_KAFKA_SASL_MECHANISM=PLAIN
+FLEXPRICE_KAFKA_SASL_USER=flexprice
+FLEXPRICE_KAFKA_SASL_PASSWORD=your_secure_password
+```
+</CodeGroup>
+
+### Required Topics
+
+FlexPrice uses these Kafka topics:
+
+- `events` - Raw event ingestion
+- `events_lazy` - Deferred event processing
+- `events_post_processing` - Post-processing pipeline
+- `events_dlq` - Dead letter queue for failed events
+- `system_events` - Internal system events and webhooks
+
+Topics are created automatically by `make init-kafka`.
+
+## Temporal Configuration
+
+FlexPrice uses Temporal for workflow orchestration:
+
+```yaml config.yaml
+temporal:
+  address: "127.0.0.1:7233"
+  tls: false
+  namespace: "default"
+  task_queue: "billing-task-queue"
+  api_key: ""
+  api_key_name: ""
+```
+
+```bash Environment Variables
+FLEXPRICE_TEMPORAL_ADDRESS=temporal:7233
+FLEXPRICE_TEMPORAL_NAMESPACE=default
+FLEXPRICE_TEMPORAL_TASK_QUEUE=billing-task-queue
+FLEXPRICE_TEMPORAL_TLS=true
+FLEXPRICE_TEMPORAL_API_KEY=your_temporal_api_key
+```
+
+## Authentication Configuration
+
+### API Key Authentication
+
+```yaml config.yaml
+auth:
+  provider: "flexprice"  # or "supabase"
+  secret: "your_jwt_secret_key"
+  api_key:
+    header: "x-api-key"
+    keys:
+      "<hashed_key>":
+        tenant_id: "00000000-0000-0000-0000-000000000000"
+        user_id: "00000000-0000-0000-0000-000000000000"
+        name: "Production API Key"
+        is_active: true
+```
+
+```bash Environment Variables
+FLEXPRICE_AUTH_PROVIDER=flexprice
+FLEXPRICE_AUTH_SECRET=your_jwt_secret_key
+FLEXPRICE_AUTH_API_KEY_HEADER=x-api-key
+```
+
+<Warning>
+API keys in config.yaml should be hashed using SHA-256. The raw key is what you provide to users.
+</Warning>
+
+### Supabase Authentication
+
+If using Supabase for authentication:
+
+```yaml config.yaml
+auth:
+  provider: "supabase"
+  supabase:
+    base_url: "https://your-project.supabase.co"
+    service_key: "your_service_key"
+```
+
+## Storage Configuration
+
+### S3 for Invoices
+
+Optional S3 storage for generated invoices:
+
+```yaml config.yaml
+s3:
+  enabled: false
+  region: "us-east-1"
+  invoice:
+    bucket: "flexprice-invoices"
+    presign_expiry_duration: "1h"
+    key_prefix: ""
+```
+
+```bash Environment Variables
+FLEXPRICE_S3_ENABLED=true
+FLEXPRICE_S3_REGION=us-east-1
+FLEXPRICE_S3_INVOICE_BUCKET=flexprice-invoices
+FLEXPRICE_S3_INVOICE_PRESIGN_EXPIRY_DURATION=1h
+```
+
+See [S3 Setup Guide](/self-hosting/configuration#s3-setup) for bucket configuration details.
+
+### Redis Configuration
+
+Redis is used for caching and distributed locking:
+
+```yaml config.yaml
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  use_tls: false
+  pool_size: 10
+  timeout: 5s
+  key_prefix: "flexprice"
+```
+
+```bash Environment Variables
+FLEXPRICE_REDIS_HOST=redis
+FLEXPRICE_REDIS_PORT=6379
+FLEXPRICE_REDIS_PASSWORD=your_redis_password
+FLEXPRICE_REDIS_USE_TLS=true
+```
+
+## Event Processing Configuration
+
+Configure rate limits and consumer groups for different processing pipelines:
+
+```yaml config.yaml
+event_processing:
+  enabled: true
+  topic: "events"
+  rate_limit: 12  # messages per second
+  consumer_group: "flexprice-consumer-local"
+
+event_processing_lazy:
+  enabled: true
+  topic: "events_lazy"
+  rate_limit: 12
+  consumer_group: "v1_event_processing_lazy"
+
+feature_usage_tracking:
+  enabled: true
+  topic: "events"
+  rate_limit: 1
+  consumer_group: "v1_feature_tracking_service"
+  wallet_alert_push_enabled: true
+```
+
+<Note>
+Adjust `rate_limit` values based on your expected event volume and infrastructure capacity.
+</Note>
+
+## Logging Configuration
+
+```yaml config.yaml
+logging:
+  level: "debug"  # debug, info, warn, error
+  db_level: "error"  # Database query logging level
+  fluentd_enabled: false
+  fluentd_host: ""
+  fluentd_port: 0
+```
+
+```bash Environment Variables
+FLEXPRICE_LOGGING_LEVEL=info
+FLEXPRICE_LOGGING_DB_LEVEL=error
+FLEXPRICE_LOGGING_FLUENTD_ENABLED=true
+FLEXPRICE_LOGGING_FLUENTD_HOST=fluentd.example.com
+FLEXPRICE_LOGGING_FLUENTD_PORT=24224
+```
+
+## Monitoring Configuration
+
+### Sentry Error Tracking
+
+```yaml config.yaml
+sentry:
+  enabled: false
+  dsn: ""
+  environment: "production"
+  sample_rate: 1.0
+```
+
+```bash Environment Variables
+FLEXPRICE_SENTRY_ENABLED=true
+FLEXPRICE_SENTRY_DSN=https://your-sentry-dsn
+FLEXPRICE_SENTRY_ENVIRONMENT=production
+FLEXPRICE_SENTRY_SAMPLE_RATE=0.1
+```
+
+### Pyroscope Profiling
+
+```yaml config.yaml
+pyroscope:
+  enabled: false
+  server_address: "http://localhost:4040"
+  application_name: "flexprice"
+  basic_auth_user: ""
+  basic_auth_password: ""
+  sample_rate: 100
+  disable_gc_runs: false
+```
+
+## Secrets Management
+
+FlexPrice requires an encryption key for sensitive data:
+
+```yaml config.yaml
+secrets:
+  encryption_key: "your_64_character_hex_key"
+```
+
+```bash Environment Variable
+FLEXPRICE_SECRETS_ENCRYPTION_KEY=your_64_character_hex_key
+```
+
+<Warning>
+Generate a secure random key:
+```bash
+openssl rand -hex 32
+```
+Never commit this key to version control.
+</Warning>
+
+## Docker Compose Example
+
+Complete example for production deployment:
+
+```yaml docker-compose.yml
+services:
+  flexprice-api:
+    image: flexprice-app:latest
+    environment:
+      - FLEXPRICE_DEPLOYMENT_MODE=api
+      - FLEXPRICE_POSTGRES_HOST=postgres
+      - FLEXPRICE_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - FLEXPRICE_KAFKA_BROKERS=kafka:9092
+      - FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+      - FLEXPRICE_TEMPORAL_ADDRESS=temporal:7233
+      - FLEXPRICE_SECRETS_ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FLEXPRICE_LOGGING_LEVEL=info
+      - FLEXPRICE_SENTRY_ENABLED=true
+      - FLEXPRICE_SENTRY_DSN=${SENTRY_DSN}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+```
+
+## Next Steps
+
+- [Choose a deployment strategy](/self-hosting/deployment)
+- [Scale your deployment](/self-hosting/scaling)
+- [Set up monitoring](/observability/overview)

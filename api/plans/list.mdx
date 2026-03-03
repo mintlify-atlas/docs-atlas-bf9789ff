@@ -1,0 +1,154 @@
+---
+title: "List Plans"
+api: "GET /v1/plans"
+description: "Retrieve a paginated list of all plans in your environment. Use when listing or searching plans for a plan picker or admin catalog."
+---
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default="10">
+  Maximum number of plans to return.
+  
+  **Example:** `20`
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of plans to skip before starting to return results.
+  
+  **Example:** `10`
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Cursor for pagination (alternative to offset).
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of plan objects.
+  
+  <Expandable title="plan properties">
+    <ResponseField name="id" type="string">
+      Unique identifier for the plan.
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Human-readable name for the plan.
+    </ResponseField>
+    
+    <ResponseField name="lookup_key" type="string">
+      Unique lookup key.
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Description of the plan.
+    </ResponseField>
+    
+    <ResponseField name="display_order" type="integer">
+      Display order for the plan.
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object">
+      Custom metadata.
+    </ResponseField>
+    
+    <ResponseField name="environment_id" type="string">
+      Environment ID where the plan exists.
+    </ResponseField>
+    
+    <ResponseField name="tenant_id" type="string">
+      Tenant ID that owns this plan.
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Status of the plan.
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp when the plan was created.
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp when the plan was last updated.
+    </ResponseField>
+    
+    <ResponseField name="prices" type="array">
+      Array of prices associated with this plan (if included).
+    </ResponseField>
+    
+    <ResponseField name="entitlements" type="array">
+      Array of entitlements associated with this plan (if included).
+    </ResponseField>
+    
+    <ResponseField name="credit_grants" type="array">
+      Array of credit grants associated with this plan (if included).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of plans matching the query.
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  Maximum number of results returned.
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Number of results skipped.
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  Whether there are more results available.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request GET \
+  --url 'https://api.flexprice.io/v1/plans?limit=20&offset=0' \
+  --header 'Authorization: Bearer <token>'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    {
+      "id": "plan_a1b2c3d4e5f6g7h8i9j0",
+      "name": "Pro Plan",
+      "lookup_key": "pro-monthly",
+      "description": "Professional tier with advanced features",
+      "display_order": 2,
+      "metadata": {
+        "tier": "professional"
+      },
+      "environment_id": "env_123",
+      "tenant_id": "tenant_123",
+      "status": "published",
+      "created_at": "2024-03-20T15:04:05Z",
+      "updated_at": "2024-03-20T15:04:05Z"
+    },
+    {
+      "id": "plan_k1l2m3n4o5p6q7r8s9t0",
+      "name": "Enterprise Plan",
+      "lookup_key": "enterprise-annual",
+      "description": "Enterprise tier with dedicated support",
+      "display_order": 3,
+      "metadata": {
+        "tier": "enterprise"
+      },
+      "environment_id": "env_123",
+      "tenant_id": "tenant_123",
+      "status": "published",
+      "created_at": "2024-03-21T10:15:30Z",
+      "updated_at": "2024-03-21T10:15:30Z"
+    }
+  ],
+  "total": 2,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
+}
+```

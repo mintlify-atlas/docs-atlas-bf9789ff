@@ -1,0 +1,477 @@
+---
+title: 'Stripe Integration'
+description: 'Integrate FlexPrice with Stripe for payment processing and subscription management'
+---
+
+FlexPrice provides comprehensive bidirectional synchronization with Stripe, enabling seamless integration between FlexPrice's billing system and Stripe's payment processing platform.
+
+## Capabilities
+
+The Stripe integration supports:
+
+- **Customer Management** - Bidirectional sync of customer data
+- **Plan Management** - Sync Stripe products as FlexPrice plans  
+- **Invoice Management** - Push FlexPrice invoices to Stripe for payment
+- **Subscription Management** - Bidirectional subscription sync
+- **Payment Processing** - Handle payments through Stripe checkout
+- **Real-time Updates** - Webhook-based synchronization
+
+## Setup
+
+<Steps>
+  <Step title="Get Stripe API Keys">
+    Navigate to your [Stripe Dashboard](https://dashboard.stripe.com/apikeys) and copy your:
+    - Publishable Key
+    - Secret Key
+    - Webhook Signing Secret (from Webhooks settings)
+  </Step>
+  
+  <Step title="Create Connection in FlexPrice">
+    Configure your Stripe connection with API credentials:
+
+    ```bash
+    curl -X POST https://api.flexprice.io/v1/connections \
+      -H "Authorization: Bearer YOUR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "provider": "stripe",
+        "name": "Stripe Production",
+        "metadata": {
+          "publishable_key": "pk_live_...",
+          "secret_key": "sk_live_...",
+          "webhook_secret": "whsec_..."
+        },
+        "sync_config": {
+          "customer_outbound_enabled": true,
+          "invoice_outbound_enabled": true,
+          "subscription_inbound_enabled": true,
+          "plan_inbound_enabled": true
+        }
+      }'
+    ```
+  </Step>
+  
+  <Step title="Configure Stripe Webhook">
+    In your Stripe Dashboard, add a webhook endpoint pointing to:
+    
+    ```
+    https://api.flexprice.io/v1/integrations/stripe/webhook
+    ```
+    
+    Select these events to listen for:
+    - `customer.created`
+    - `product.created`, `product.updated`, `product.deleted`
+    - `subscription.created`, `subscription.updated`, `subscription.deleted`
+    - `payment_intent.succeeded`, `payment_intent.payment_failed`
+    - `invoice.paid`
+    - `setup_intent.succeeded`
+    - `checkout.session.completed`
+  </Step>
+</Steps>
+
+## Customer Sync
+
+### FlexPrice to Stripe
+
+When you create or update a customer in FlexPrice, they are automatically synced to Stripe:
+
+```go
+// Ensures customer exists in Stripe before invoice sync
+func (s *CustomerService) EnsureCustomerSyncedToStripe(
+    ctx context.Context,
+    customerID string,
+    customerService interfaces.CustomerService,
+) (*dto.CustomerResponse, error) {
+    // Check if already synced via metadata or mapping table
+    // If not, create customer in Stripe with FlexPrice data
+    // Update FlexPrice customer with stripe_customer_id
+    // Create entity integration mapping
+}
+```
+
+**Stripe Customer Creation:**
+
+```go
+params := &stripe.CustomerCreateParams{
+    Name:  stripe.String(customer.Name),
+    Email: stripe.String(customer.Email),
+    Metadata: map[string]string{
+        "flexprice_customer_id": customer.ID,
+        "flexprice_environment": customer.EnvironmentID,
+        "external_id":           customer.ExternalID,
+    },
+    Address: &stripe.AddressParams{
+        Line1:      stripe.String(customer.AddressLine1),
+        Line2:      stripe.String(customer.AddressLine2),
+        City:       stripe.String(customer.AddressCity),
+        State:      stripe.String(customer.AddressState),
+        PostalCode: stripe.String(customer.AddressPostalCode),
+        Country:    stripe.String(customer.AddressCountry),
+    },
+}
+```
+
+### Stripe to FlexPrice
+
+When a customer is created in Stripe, a webhook triggers customer creation in FlexPrice:
+
+<CodeGroup>
+```go Go Webhook Handler
+func (h *Handler) handleCustomerCreated(
+    ctx context.Context,
+    event *stripe.Event,
+    environmentID string,
+    services *ServiceDependencies,
+) error {
+    var stripeCustomer stripe.Customer
+    json.Unmarshal(event.Data.Raw, &stripeCustomer)
+    
+    // Create customer in FlexPrice from Stripe data
+    err := h.customerSvc.CreateCustomerFromStripe(
+        ctx,
+        &stripeCustomer,
+        environmentID,
+        services.CustomerService,
+    )
+    return err
+}
+```
+
+```json Webhook Payload
+{
+  "type": "customer.created",
+  "data": {
+    "object": {
+      "id": "cus_...",
+      "email": "customer@example.com",
+      "name": "John Doe",
+      "metadata": {
+        "flexprice_lookup_key": "customer-123"
+      }
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Invoice Sync
+
+### Sync Invoice to Stripe
+
+Push a FlexPrice invoice to Stripe for payment collection:
+
+```bash
+curl -X POST https://api.flexprice.io/v1/invoices/{invoice_id}/sync/stripe \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Process Flow:**
+
+<Steps>
+  <Step title="Check Stripe Connection">
+    Verify Stripe integration is configured
+  </Step>
+  
+  <Step title="Ensure Customer Synced">
+    Sync customer to Stripe if not already synced
+  </Step>
+  
+  <Step title="Check Existing Mapping">
+    Avoid duplicate invoice creation
+  </Step>
+  
+  <Step title="Create Draft Invoice">
+    Create invoice in Stripe with draft status
+  </Step>
+  
+  <Step title="Sync Line Items">
+    Add all invoice line items to Stripe invoice
+  </Step>
+  
+  <Step title="Finalize Invoice">
+    Make invoice ready for payment
+  </Step>
+  
+  <Step title="Create Entity Mapping">
+    Track FlexPrice invoice ↔ Stripe invoice relationship
+  </Step>
+</Steps>
+
+**Invoice Creation Parameters:**
+
+```go
+params := &stripe.InvoiceCreateParams{
+    Customer:    stripe.String(stripeCustomerID),
+    Currency:    stripe.String(strings.ToLower(invoice.Currency)),
+    AutoAdvance: stripe.Bool(true),
+    Description: stripe.String(invoice.Description),
+    CollectionMethod: stripe.String("charge_automatically"),
+    Metadata: map[string]string{
+        "flexprice_invoice_id":     invoice.ID,
+        "flexprice_customer_id":    invoice.CustomerID,
+        "flexprice_invoice_number": invoice.InvoiceNumber,
+        "sync_source":              "flexprice",
+    },
+}
+```
+
+## Payment Processing
+
+### Checkout Session
+
+Create a Stripe checkout session for an invoice:
+
+```bash
+curl -X POST https://api.flexprice.io/v1/payments/stripe/checkout \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invoice_id": "inv_...",
+    "success_url": "https://yourapp.com/success",
+    "cancel_url": "https://yourapp.com/cancel"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_...",
+  "session_id": "cs_...",
+  "payment_id": "pay_..."
+}
+```
+
+### Payment Webhooks
+
+FlexPrice handles these Stripe payment webhooks:
+
+<CodeGroup>
+```go payment_intent.succeeded
+// Updates payment status and reconciles with invoice
+func (h *Handler) handlePaymentIntentSucceeded(
+    ctx context.Context,
+    event *stripe.Event,
+    environmentID string,
+    services *ServiceDependencies,
+) error {
+    var paymentIntent stripe.PaymentIntent
+    json.Unmarshal(event.Data.Raw, &paymentIntent)
+    
+    // Check if FlexPrice-initiated or external payment
+    if flexpricePaymentID := paymentIntent.Metadata["flexprice_payment_id"]; flexpricePaymentID != "" {
+        // Handle FlexPrice payment
+    } else {
+        // Handle external Stripe payment
+        return h.paymentSvc.HandleExternalStripePaymentFromWebhook(
+            ctx, &paymentIntent, event.Data.Raw,
+            services.PaymentService, services.InvoiceService,
+        )
+    }
+}
+```
+
+```go payment_intent.payment_failed
+// Updates payment status to failed
+func (h *Handler) handlePaymentIntentPaymentFailed(
+    ctx context.Context,
+    event *stripe.Event,
+    environmentID string,
+    services *ServiceDependencies,
+) error {
+    var paymentIntent stripe.PaymentIntent
+    json.Unmarshal(event.Data.Raw, &paymentIntent)
+    
+    flexpricePaymentID := paymentIntent.Metadata["flexprice_payment_id"]
+    
+    // Update payment record to failed status
+    updateReq := dto.UpdatePaymentRequest{
+        PaymentStatus: types.PaymentStatusFailed,
+        FailedAt:      time.Now(),
+        ErrorMessage:  paymentIntent.LastPaymentError.Msg,
+    }
+    
+    return services.PaymentService.UpdatePayment(ctx, flexpricePaymentID, updateReq)
+}
+```
+
+```go invoice.paid
+// Reconciles external Stripe invoice payments
+func (h *Handler) handleInvoicePaymentPaid(
+    ctx context.Context,
+    event *stripe.Event,
+    environmentID string,
+    services *ServiceDependencies,
+) error {
+    // Extract invoice ID and payment intent ID from webhook
+    // Check if payment already exists
+    // Get payment intent details from Stripe
+    // Process external Stripe payment
+    return h.paymentSvc.ProcessExternalStripePayment(
+        ctx, paymentIntent, stripeInvoiceID,
+        services.PaymentService, services.InvoiceService,
+    )
+}
+```
+</CodeGroup>
+
+## Subscription Sync
+
+### Stripe to FlexPrice
+
+When subscriptions are created or updated in Stripe, webhooks sync them to FlexPrice:
+
+```go
+// subscription.created webhook handler
+func (h *Handler) handleSubscriptionCreated(
+    ctx context.Context,
+    event *stripe.Event,
+    environmentID string,
+    services *ServiceDependencies,
+) error {
+    var subscription stripe.Subscription
+    json.Unmarshal(event.Data.Raw, &subscription)
+    
+    // Create subscription in FlexPrice
+    sub, err := h.subSvc.CreateSubscription(ctx, subscription.ID, services)
+    return err
+}
+```
+
+**Subscription Creation Process:**
+
+<Steps>
+  <Step title="Fetch Stripe Subscription">
+    Retrieve full subscription data from Stripe API
+  </Step>
+  
+  <Step title="Check Existing Mapping">
+    Prevent duplicate subscription creation
+  </Step>
+  
+  <Step title="Create/Find Customer">
+    Ensure customer exists in FlexPrice
+  </Step>
+  
+  <Step title="Create/Find Plan">
+    Sync Stripe product as FlexPrice plan
+  </Step>
+  
+  <Step title="Create Subscription">
+    Create subscription in FlexPrice with Stripe data
+  </Step>
+  
+  <Step title="Create Entity Mapping">
+    Track subscription relationship
+  </Step>
+</Steps>
+
+## Plan Sync
+
+### Stripe Products to FlexPrice Plans
+
+Stripe products can be synced as FlexPrice plans via webhooks:
+
+<CodeGroup>
+```go product.created
+func (h *Handler) handleProductCreated(
+    ctx context.Context,
+    event *stripe.Event,
+    environmentID string,
+    services *ServiceDependencies,
+) error {
+    var product stripe.Product
+    json.Unmarshal(event.Data.Raw, &product)
+    
+    // Create plan in FlexPrice from Stripe product
+    plan, err := h.planSvc.CreatePlan(ctx, product.ID, services)
+    return err
+}
+```
+
+```go Plan Creation
+createPlanReq := dto.CreatePlanRequest{
+    Name:         stripeProduct.Name,
+    Description:  stripeProduct.Description,
+    LookupKey:    productID,
+    Prices:       []dto.CreatePlanPriceRequest{},
+    Entitlements: []dto.CreatePlanEntitlementRequest{},
+    Metadata: types.Metadata{
+        "source":            "stripe",
+        "stripe_plan_id":    productID,
+        "stripe_product_id": stripeProduct.ID,
+    },
+}
+```
+</CodeGroup>
+
+## Configuration Options
+
+### Sync Configuration
+
+Control sync behavior per connection:
+
+```json
+{
+  "sync_config": {
+    "customer_inbound_enabled": true,    // Stripe → FlexPrice
+    "customer_outbound_enabled": true,   // FlexPrice → Stripe
+    "plan_inbound_enabled": true,        // Stripe products → FlexPrice plans
+    "invoice_outbound_enabled": true,    // FlexPrice invoices → Stripe
+    "subscription_inbound_enabled": true // Stripe subs → FlexPrice
+  }
+}
+```
+
+<Note>
+  Each webhook handler checks sync configuration before processing. If disabled, the event is skipped.
+</Note>
+
+## Entity Integration Mapping
+
+FlexPrice maintains bidirectional mappings between entities:
+
+```go
+type EntityIntegrationMapping struct {
+    ID               string // Unique mapping ID
+    EntityID         string // FlexPrice entity ID (customer, invoice, etc.)
+    EntityType       string // customer, plan, invoice, subscription
+    ProviderType     string // "stripe"
+    ProviderEntityID string // Stripe entity ID (cus_..., inv_..., etc.)
+    Metadata         map[string]interface{} // Sync context
+    EnvironmentID    string
+}
+```
+
+**Usage:**
+
+```go
+// Find Stripe customer ID for FlexPrice customer
+filter := &types.EntityIntegrationMappingFilter{
+    EntityID:      customerID,
+    EntityType:    types.IntegrationEntityTypeCustomer,
+    ProviderTypes: []string{"stripe"},
+}
+mappings, err := repo.List(ctx, filter)
+stripeCustomerID := mappings[0].ProviderEntityID
+```
+
+## Error Handling
+
+The integration handles errors gracefully:
+
+- **Network Failures** - Retry with exponential backoff
+- **Invalid Data** - Log and skip invalid webhook events
+- **Mapping Conflicts** - Handle duplicate mappings
+- **Idempotent Processing** - Webhook replays are safe
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Webhook Configuration" icon="webhook" href="/integrations/webhooks">
+    Learn about FlexPrice outbound webhooks
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Explore integration API endpoints
+  </Card>
+</CardGroup>

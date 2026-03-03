@@ -1,0 +1,231 @@
+---
+title: "Get Subscription"
+api: "GET /v1/subscriptions/{id}"
+description: "Retrieve details of a specific subscription by ID. Use when you need to load a single subscription for a billing portal or to check status."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique identifier of the subscription.
+  
+  **Example:** `"sub_x1y2z3a4b5c6d7e8f9g0"`
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the subscription.
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  FlexPrice customer ID.
+</ResponseField>
+
+<ResponseField name="plan_id" type="string">
+  Plan ID.
+</ResponseField>
+
+<ResponseField name="subscription_status" type="string">
+  Current subscription status.
+  
+  **Values:** `"ACTIVE"`, `"CANCELLED"`, `"INCOMPLETE"`, `"EXPIRED"`, `"PAUSED"`, `"DRAFT"`
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Three-letter ISO currency code.
+</ResponseField>
+
+<ResponseField name="billing_cadence" type="string">
+  Billing frequency.
+  
+  **Values:** `"IN_ADVANCE"`, `"IN_ARREARS"`
+</ResponseField>
+
+<ResponseField name="billing_period" type="string">
+  Billing period unit.
+  
+  **Values:** `"DAY"`, `"WEEK"`, `"MONTH"`, `"QUARTER"`, `"YEAR"`
+</ResponseField>
+
+<ResponseField name="billing_period_count" type="integer">
+  Number of billing periods per cycle.
+</ResponseField>
+
+<ResponseField name="billing_anchor" type="string">
+  ISO 8601 timestamp of the billing anchor date.
+</ResponseField>
+
+<ResponseField name="billing_cycle" type="string">
+  Billing cycle type.
+  
+  **Values:** `"ANNIVERSARY"`, `"CALENDAR"`
+</ResponseField>
+
+<ResponseField name="start_date" type="string">
+  ISO 8601 timestamp when subscription starts.
+</ResponseField>
+
+<ResponseField name="end_date" type="string">
+  ISO 8601 timestamp when subscription ends (if set).
+</ResponseField>
+
+<ResponseField name="current_period_start" type="string">
+  ISO 8601 timestamp of current billing period start.
+</ResponseField>
+
+<ResponseField name="current_period_end" type="string">
+  ISO 8601 timestamp of current billing period end.
+</ResponseField>
+
+<ResponseField name="cancelled_at" type="string">
+  ISO 8601 timestamp when subscription was cancelled (if applicable).
+</ResponseField>
+
+<ResponseField name="cancel_at" type="string">
+  ISO 8601 timestamp when subscription will be cancelled (if scheduled).
+</ResponseField>
+
+<ResponseField name="cancel_at_period_end" type="boolean">
+  Whether subscription will cancel at period end.
+</ResponseField>
+
+<ResponseField name="trial_start" type="string">
+  ISO 8601 timestamp of trial start (if applicable).
+</ResponseField>
+
+<ResponseField name="trial_end" type="string">
+  ISO 8601 timestamp of trial end (if applicable).
+</ResponseField>
+
+<ResponseField name="pause_status" type="string">
+  Current pause status.
+  
+  **Values:** `"NONE"`, `"PAUSED"`
+</ResponseField>
+
+<ResponseField name="commitment_amount" type="string">
+  Minimum committed amount (if set).
+</ResponseField>
+
+<ResponseField name="commitment_duration" type="string">
+  Commitment duration (if set).
+</ResponseField>
+
+<ResponseField name="overage_factor" type="string">
+  Overage multiplier (if set).
+</ResponseField>
+
+<ResponseField name="enable_true_up" type="boolean">
+  Whether true-up fee is enabled.
+</ResponseField>
+
+<ResponseField name="payment_behavior" type="string">
+  Payment handling behavior.
+</ResponseField>
+
+<ResponseField name="collection_method" type="string">
+  Invoice collection method.
+</ResponseField>
+
+<ResponseField name="customer_timezone" type="string">
+  Customer's timezone.
+</ResponseField>
+
+<ResponseField name="proration_behavior" type="string">
+  Proration handling.
+</ResponseField>
+
+<ResponseField name="parent_subscription_id" type="string">
+  Parent subscription ID (if part of hierarchy).
+</ResponseField>
+
+<ResponseField name="payment_terms" type="string">
+  Payment terms for invoices.
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata.
+</ResponseField>
+
+<ResponseField name="version" type="integer">
+  Subscription version number.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the subscription was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp when the subscription was last updated.
+</ResponseField>
+
+<ResponseField name="plan" type="object">
+  Plan details.
+</ResponseField>
+
+<ResponseField name="customer" type="object">
+  Customer details.
+</ResponseField>
+
+<ResponseField name="coupon_associations" type="array">
+  Array of associated coupons.
+</ResponseField>
+
+<ResponseField name="phases" type="array">
+  Array of subscription phases.
+</ResponseField>
+
+<ResponseField name="credit_grants" type="array">
+  Array of credit grants.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request GET \
+  --url https://api.flexprice.io/v1/subscriptions/sub_x1y2z3a4b5c6d7e8f9g0 \
+  --header 'Authorization: Bearer <token>'
+```
+
+## Example Response
+
+```json
+{
+  "id": "sub_x1y2z3a4b5c6d7e8f9g0",
+  "customer_id": "cust_a1b2c3d4e5f6g7h8i9j0",
+  "plan_id": "plan_a1b2c3d4e5f6g7h8i9j0",
+  "subscription_status": "ACTIVE",
+  "currency": "usd",
+  "billing_cadence": "IN_ADVANCE",
+  "billing_period": "MONTH",
+  "billing_period_count": 1,
+  "billing_anchor": "2024-03-20T00:00:00Z",
+  "billing_cycle": "ANNIVERSARY",
+  "start_date": "2024-03-20T00:00:00Z",
+  "current_period_start": "2024-03-20T00:00:00Z",
+  "current_period_end": "2024-04-20T00:00:00Z",
+  "cancel_at_period_end": false,
+  "pause_status": "NONE",
+  "overage_factor": "1.0",
+  "enable_true_up": false,
+  "payment_behavior": "DEFAULT_ACTIVE",
+  "collection_method": "CHARGE_AUTOMATICALLY",
+  "customer_timezone": "UTC",
+  "proration_behavior": "NONE",
+  "metadata": {
+    "source": "website"
+  },
+  "version": 1,
+  "created_at": "2024-03-20T15:04:05Z",
+  "updated_at": "2024-03-20T15:04:05Z",
+  "plan": {
+    "id": "plan_a1b2c3d4e5f6g7h8i9j0",
+    "name": "Pro Plan"
+  },
+  "customer": {
+    "id": "cust_a1b2c3d4e5f6g7h8i9j0",
+    "name": "Acme Corporation"
+  }
+}
+```

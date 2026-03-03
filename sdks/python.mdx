@@ -1,0 +1,357 @@
+---
+title: Python SDK
+description: Type-safe Python client with sync and async support
+---
+
+## Installation
+
+Install the FlexPrice Python SDK using pip:
+
+```bash
+pip install flexprice
+```
+
+**Alternative package managers:**
+
+<CodeGroup>
+```bash uv
+uv add flexprice
+```
+
+```bash poetry
+poetry add flexprice
+```
+</CodeGroup>
+
+**Requirements:**
+- Python 3.10 or higher
+
+## Quick Start
+
+Initialize the client and ingest an event:
+
+```python
+from flexprice import Flexprice
+
+# Initialize client (base URL must include /v1)
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth="YOUR_API_KEY",
+) as flexprice:
+    # Ingest an event
+    result = flexprice.events.ingest_event(
+        request={
+            "event_name": "api_request",
+            "external_customer_id": "customer-123",
+            "properties": {
+                "endpoint": "/api/resource",
+                "method": "POST",
+                "status": "200",
+            },
+            "source": "python_app",
+        }
+    )
+    print(result)
+```
+
+## Initialization
+
+Create a FlexPrice client with your API key:
+
+```python
+from flexprice import Flexprice
+import os
+
+# Basic initialization
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    # Your code here
+    pass
+```
+
+<Warning>
+  Always use the context manager (`with` statement) to ensure proper resource cleanup.
+</Warning>
+
+<Note>
+  The server URL must include `/v1` and have no trailing slash: `https://us.api.flexprice.io/v1`
+</Note>
+
+## Creating a Customer
+
+```python
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    customer = flexprice.customers.create_customer(
+        request={
+            "external_id": "customer-123",
+            "email": "user@example.com",
+            "name": "Example Customer",
+        }
+    )
+    print(f"Created customer: {customer.id}")
+```
+
+## Ingesting Events
+
+### Sync Client
+
+```python
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    result = flexprice.events.ingest_event(
+        request={
+            "event_name": "file_upload",
+            "external_customer_id": "customer-123",
+            "properties": {
+                "file_size_bytes": 1048576,
+                "file_type": "pdf",
+            },
+            "source": "upload_service",
+        }
+    )
+    print(result)
+```
+
+### Async Client
+
+For async operations, use the async context manager:
+
+```python
+import asyncio
+from flexprice import Flexprice
+import os
+
+async def main():
+    async with Flexprice(
+        server_url="https://us.api.flexprice.io/v1",
+        api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+    ) as flexprice:
+        result = await flexprice.events.ingest_event_async(
+            request={
+                "event_name": "api_request",
+                "external_customer_id": "customer-123",
+                "properties": {"endpoint": "/api/data"},
+                "source": "async_service",
+            }
+        )
+        print(result)
+
+asyncio.run(main())
+```
+
+<Note>
+  Use `ingest_event_async()` for async calls and `ingest_event()` for sync calls.
+</Note>
+
+## Error Handling
+
+```python
+from flexprice import Flexprice
+
+try:
+    with Flexprice(
+        server_url="https://us.api.flexprice.io/v1",
+        api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+    ) as flexprice:
+        result = flexprice.events.ingest_event(
+            request={
+                "event_name": "test_event",
+                "external_customer_id": "customer-123",
+            }
+        )
+except Exception as e:
+    print(f"Error: {e}")
+    # Inspect status code and response body if available
+    if hasattr(e, 'status_code'):
+        print(f"Status code: {e.status_code}")
+```
+
+## Common Operations
+
+<CodeGroup>
+```python List Customers
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    customers = flexprice.customers.list_customers(
+        page_size=50,
+        page=1,
+    )
+    
+    for customer in customers.customers:
+        print(f"Customer: {customer.name} ({customer.external_id})")
+```
+
+```python Create Subscription
+from datetime import datetime
+
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    subscription = flexprice.subscriptions.create_subscription(
+        request={
+            "customer_id": customer_id,
+            "plan_id": plan_id,
+            "start_date": datetime.now().isoformat(),
+        }
+    )
+    print(f"Created subscription: {subscription.id}")
+```
+
+```python List Invoices
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    invoices = flexprice.invoices.list_invoices(
+        customer_id=customer_id,
+        page_size=20,
+    )
+    
+    for invoice in invoices.invoices:
+        print(f"Invoice: {invoice.invoice_number} - {invoice.total}")
+```
+
+```python Get Customer Usage
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    usage = flexprice.events.list_raw_events(
+        external_customer_id="customer-123",
+        page_size=100,
+    )
+    print(f"Total events: {len(usage.events)}")
+```
+</CodeGroup>
+
+## Type Safety
+
+The Python SDK uses Pydantic models for type-safe request and response handling:
+
+```python
+from flexprice import Flexprice
+from typing import Dict, Any
+
+# Type hints work automatically
+with Flexprice(
+    server_url="https://us.api.flexprice.io/v1",
+    api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+) as flexprice:
+    # Request is type-checked
+    event_data: Dict[str, Any] = {
+        "event_name": "api_request",
+        "external_customer_id": "customer-123",
+        "properties": {"key": "value"},
+    }
+    
+    result = flexprice.events.ingest_event(request=event_data)
+    # Response is a Pydantic model with autocomplete
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use environment variables">
+    Store API keys in environment variables or a `.env` file:
+    ```python
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    api_key = os.getenv("FLEXPRICE_API_KEY")
+    ```
+  </Step>
+  
+  <Step title="Always use context managers">
+    Use `with` statements for proper resource cleanup:
+    ```python
+    with Flexprice(...) as flexprice:
+        # Your code
+    ```
+  </Step>
+  
+  <Step title="Choose sync vs async appropriately">
+    - Use sync for simple scripts and WSGI apps (Flask, Django)
+    - Use async for high-concurrency apps (FastAPI, aiohttp)
+  </Step>
+  
+  <Step title="Handle errors gracefully">
+    Wrap API calls in try/except blocks and inspect error details
+  </Step>
+</Steps>
+
+## Async Patterns
+
+### Multiple Concurrent Requests
+
+```python
+import asyncio
+from flexprice import Flexprice
+import os
+
+async def ingest_events(events):
+    async with Flexprice(
+        server_url="https://us.api.flexprice.io/v1",
+        api_key_auth=os.getenv("FLEXPRICE_API_KEY"),
+    ) as flexprice:
+        tasks = [
+            flexprice.events.ingest_event_async(request=event)
+            for event in events
+        ]
+        results = await asyncio.gather(*tasks)
+        return results
+
+events = [
+    {"event_name": "event1", "external_customer_id": "customer-123"},
+    {"event_name": "event2", "external_customer_id": "customer-456"},
+]
+
+results = asyncio.run(ingest_events(events))
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Missing or invalid API key">
+    Ensure `FLEXPRICE_API_KEY` is set in your environment or `.env` file. Get keys from the [FlexPrice dashboard](https://app.flexprice.io).
+  </Accordion>
+  
+  <Accordion title="Wrong server URL">
+    Use `https://us.api.flexprice.io/v1` (include `/v1`, no trailing slash).
+  </Accordion>
+  
+  <Accordion title="4xx/5xx errors on ingest">
+    Event ingestion returns `202 Accepted`. For errors, verify:
+    - `event_name` is provided
+    - `external_customer_id` exists
+    - `properties` is a valid dictionary
+  </Accordion>
+  
+  <Accordion title="Type errors">
+    The SDK uses Pydantic models. Ensure request fields match the API schema documented in the [API reference](https://docs.flexprice.io).
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="https://docs.flexprice.io">
+    Complete FlexPrice API documentation
+  </Card>
+  <Card title="Python SDK Examples" icon="code" href="https://github.com/flexprice/python-sdk/tree/main/examples">
+    Sample code and integration examples
+  </Card>
+  <Card title="PyPI Package" icon="python" href="https://pypi.org/project/flexprice">
+    View package on PyPI
+  </Card>
+</CardGroup>

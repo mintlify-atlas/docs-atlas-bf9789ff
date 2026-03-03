@@ -1,0 +1,263 @@
+---
+title: "List Features"
+api: "GET /v1/features"
+description: "Use when listing or searching features (e.g. catalog or entitlement setup). Returns a paginated list; supports filtering and sorting."
+---
+
+## Query Parameters
+
+<ParamField query="type" type="string">
+  Filter by feature type
+  
+  **Values:** `BOOLEAN`, `METERED`, `STATIC`
+</ParamField>
+
+<ParamField query="lookup_key" type="string">
+  Filter by exact lookup key
+</ParamField>
+
+<ParamField query="meter_id" type="string">
+  Filter by associated meter ID (returns only METERED features)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="10">
+  Number of features to return per page (max 100)
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of features to skip for pagination
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="created_at">
+  Field to sort by
+  
+  **Values:** `created_at`, `updated_at`, `name`, `type`
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="desc">
+  Sort order
+  
+  **Values:** `asc`, `desc`
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of feature objects
+  
+  <Expandable title="Feature object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the feature
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Name of the feature
+    </ResponseField>
+    
+    <ResponseField name="lookup_key" type="string">
+      Lookup key for programmatic access
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Feature type (BOOLEAN, METERED, or STATIC)
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Feature description
+    </ResponseField>
+    
+    <ResponseField name="meter_id" type="string">
+      ID of the associated meter (for METERED features)
+    </ResponseField>
+    
+    <ResponseField name="meter" type="object">
+      Full meter object (if expanded)
+    </ResponseField>
+    
+    <ResponseField name="unit_singular" type="string">
+      Singular unit name
+    </ResponseField>
+    
+    <ResponseField name="unit_plural" type="string">
+      Plural unit name
+    </ResponseField>
+    
+    <ResponseField name="alert_settings" type="object">
+      Alert configuration
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object">
+      Custom metadata
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      Timestamp when feature was created
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      Timestamp when feature was last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of features matching the filter criteria
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  Number of features returned per page
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Number of features skipped
+</ResponseField>
+
+<RequestExample>
+```bash cURL - List all features
+curl -X GET "https://api.flexprice.io/v1/features?limit=20" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - List metered features
+curl -X GET "https://api.flexprice.io/v1/features?type=METERED" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL - Find feature by lookup key
+curl -X GET "https://api.flexprice.io/v1/features?lookup_key=api_calls" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+# List all features
+features = client.features.list(limit=20)
+
+# List metered features
+features = client.features.list(type="METERED")
+
+# Find feature by lookup key
+features = client.features.list(lookup_key="api_calls")
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+// List all features
+const features = await client.features.list({ limit: 20 });
+
+// List metered features
+const features = await client.features.list({ type: "METERED" });
+
+// Find feature by lookup key
+const features = await client.features.list({ lookupKey: "api_calls" });
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+// List all features
+features, err := client.Features.List(context.Background(), &flexprice.FeatureListParams{
+    Limit: 20,
+})
+
+// List metered features
+features, err := client.Features.List(context.Background(), &flexprice.FeatureListParams{
+    Type: "METERED",
+})
+
+// Find feature by lookup key
+features, err := client.Features.List(context.Background(), &flexprice.FeatureListParams{
+    LookupKey: "api_calls",
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "data": [
+    {
+      "id": "feat_abc123",
+      "name": "API Calls",
+      "lookup_key": "api_calls",
+      "type": "METERED",
+      "description": "REST API access with usage tracking",
+      "meter_id": "meter_xyz789",
+      "unit_singular": "API call",
+      "unit_plural": "API calls",
+      "metadata": {},
+      "created_at": "2024-01-15T10:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
+    },
+    {
+      "id": "feat_def456",
+      "name": "Advanced Analytics",
+      "lookup_key": "advanced_analytics",
+      "type": "BOOLEAN",
+      "description": "Access to advanced analytics dashboard",
+      "metadata": {},
+      "created_at": "2024-01-10T08:30:00Z",
+      "updated_at": "2024-01-10T08:30:00Z"
+    },
+    {
+      "id": "feat_ghi789",
+      "name": "Team Members",
+      "lookup_key": "team_members",
+      "type": "STATIC",
+      "description": "Number of team members allowed",
+      "metadata": {},
+      "created_at": "2024-01-05T12:00:00Z",
+      "updated_at": "2024-01-05T12:00:00Z"
+    }
+  ],
+  "total": 3,
+  "limit": 20,
+  "offset": 0
+}
+```
+</ResponseExample>
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="Build a Feature Catalog">
+    List all features to display in your pricing page or admin panel:
+    
+    ```python
+    features = client.features.list(
+        limit=100,
+        sort_by="name",
+        sort_order="asc"
+    )
+    
+    for feature in features.data:
+        print(f"{feature.name} ({feature.type})")
+    ```
+  </Accordion>
+  
+  <Accordion title="Find Metered Features">
+    Get all usage-based features for analytics or billing setup:
+    
+    ```bash
+    curl -X GET "https://api.flexprice.io/v1/features?type=METERED" \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+  </Accordion>
+  
+  <Accordion title="Resolve Feature by Lookup Key">
+    When implementing feature gates in your application:
+    
+    ```typescript
+    const features = await client.features.list({
+      lookupKey: "advanced_analytics"
+    });
+    
+    const feature = features.data[0];
+    if (feature) {
+      // Use feature.id for entitlement checks
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

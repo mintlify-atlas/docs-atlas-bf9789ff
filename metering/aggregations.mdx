@@ -1,0 +1,645 @@
+---
+title: "Usage Aggregation Methods"
+description: "Understand FlexPrice's aggregation types for transforming events into billable usage"
+---
+
+Aggregation methods determine how raw events are calculated into measurable usage metrics. FlexPrice supports multiple aggregation types to handle different pricing models.
+
+## Available Aggregation Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `COUNT` | Count number of events | Per-request billing, transaction counts |
+| `SUM` | Sum values from event property | Data transfer, token consumption |
+| `MAX` | Maximum value in period | Peak usage, concurrent capacity |
+| `LATEST` | Most recent value | Current state metrics |
+| `AVG` | Average value | Average response time, utilization |
+| `COUNT_UNIQUE` | Count distinct values | Active users, unique IPs |
+| `SUM_WITH_MULTIPLIER` | Sum with unit conversion | Time-based billing with rates |
+| `WEIGHTED_SUM` | Weighted sum calculation | Complex multi-factor pricing |
+
+## COUNT
+
+Counts the number of events that match the meter configuration.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "COUNT"
+  }
+}
+```
+
+### Use Cases
+
+<CodeGroup>
+```json API Requests
+{
+  "name": "API Calls",
+  "event_name": "api_request",
+  "aggregation": {"type": "COUNT"}
+}
+```
+
+```json Transactions
+{
+  "name": "Payment Transactions",
+  "event_name": "payment_processed",
+  "aggregation": {"type": "COUNT"}
+}
+```
+
+```json File Uploads
+{
+  "name": "File Uploads",
+  "event_name": "file_uploaded",
+  "aggregation": {"type": "COUNT"}
+}
+```
+</CodeGroup>
+
+### Example
+
+**Events:**
+```json
+{"event_name": "api_request", "timestamp": "2024-03-20T10:00:00Z"}
+{"event_name": "api_request", "timestamp": "2024-03-20T10:05:00Z"}
+{"event_name": "api_request", "timestamp": "2024-03-20T10:10:00Z"}
+```
+
+**Result:** `3`
+
+## SUM
+
+Sums numeric values from a specified event property.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "SUM",
+    "field": "property_name"
+  }
+}
+```
+
+### Use Cases
+
+<CodeGroup>
+```json Data Transfer
+{
+  "name": "Bytes Transferred",
+  "event_name": "data_transfer",
+  "aggregation": {
+    "type": "SUM",
+    "field": "bytes"
+  }
+}
+```
+
+```json AI Tokens
+{
+  "name": "Total Tokens",
+  "event_name": "ai_completion",
+  "aggregation": {
+    "type": "SUM",
+    "field": "total_tokens"
+  }
+}
+```
+
+```json Compute Seconds
+{
+  "name": "Compute Duration",
+  "event_name": "compute_usage",
+  "aggregation": {
+    "type": "SUM",
+    "field": "duration_seconds"
+  }
+}
+```
+</CodeGroup>
+
+### Example
+
+**Events:**
+```json
+{"event_name": "data_transfer", "properties": {"bytes": 1024}}
+{"event_name": "data_transfer", "properties": {"bytes": 2048}}
+{"event_name": "data_transfer", "properties": {"bytes": 512}}
+```
+
+**Result:** `3584` (1024 + 2048 + 512)
+
+## MAX
+
+Returns the maximum value from a specified event property within the billing period.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "MAX",
+    "field": "property_name"
+  }
+}
+```
+
+### Bucketed MAX
+
+For windowed aggregations, use `bucket_size`:
+
+```json
+{
+  "aggregation": {
+    "type": "MAX",
+    "field": "property_name",
+    "bucket_size": "HOUR"
+  }
+}
+```
+
+**How it works:**
+1. Events are grouped into time buckets (HOUR, DAY, WEEK, MONTH)
+2. MAX is calculated within each bucket
+3. Bucket maxes are summed for the total
+
+### Use Cases
+
+<CodeGroup>
+```json Peak Storage
+{
+  "name": "Peak Storage Used",
+  "event_name": "storage_snapshot",
+  "aggregation": {
+    "type": "MAX",
+    "field": "bytes"
+  }
+}
+```
+
+```json Concurrent Users
+{
+  "name": "Peak Concurrent Users",
+  "event_name": "active_users",
+  "aggregation": {
+    "type": "MAX",
+    "field": "count",
+    "bucket_size": "HOUR"
+  }
+}
+```
+
+```json Max Bandwidth
+{
+  "name": "Peak Bandwidth",
+  "event_name": "bandwidth_usage",
+  "aggregation": {
+    "type": "MAX",
+    "field": "mbps",
+    "bucket_size": "DAY"
+  }
+}
+```
+</CodeGroup>
+
+### Example (Simple MAX)
+
+**Events:**
+```json
+{"event_name": "storage_snapshot", "properties": {"bytes": 1000000}}
+{"event_name": "storage_snapshot", "properties": {"bytes": 2000000}}
+{"event_name": "storage_snapshot", "properties": {"bytes": 1500000}}
+```
+
+**Result:** `2000000`
+
+### Example (Bucketed MAX)
+
+**Events** (2 hours):
+```json
+// Hour 1
+{"timestamp": "2024-03-20T10:00:00Z", "properties": {"connections": 100}}
+{"timestamp": "2024-03-20T10:30:00Z", "properties": {"connections": 150}}
+
+// Hour 2
+{"timestamp": "2024-03-20T11:00:00Z", "properties": {"connections": 80}}
+{"timestamp": "2024-03-20T11:30:00Z", "properties": {"connections": 120}}
+```
+
+**Calculation:**
+- Hour 1 max: 150
+- Hour 2 max: 120
+- **Total: 270** (150 + 120)
+
+### Grouped MAX
+
+For bucketed MAX, use `group_by` to aggregate per property value:
+
+```json
+{
+  "aggregation": {
+    "type": "MAX",
+    "field": "active_seats",
+    "bucket_size": "DAY",
+    "group_by": "organization_id"
+  }
+}
+```
+
+**How it works:**
+1. Events grouped by bucket and `group_by` property
+2. MAX calculated per group per bucket
+3. All group maxes summed across all buckets
+
+**Example:**
+```json
+// Day 1, Org A: max 10 seats
+// Day 1, Org B: max 5 seats
+// Day 2, Org A: max 12 seats
+// Day 2, Org B: max 6 seats
+// Total: 33 (10 + 5 + 12 + 6)
+```
+
+## LATEST
+
+Returns the most recent value from a specified event property.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "LATEST",
+    "field": "property_name"
+  }
+}
+```
+
+### Use Cases
+
+<CodeGroup>
+```json Current Storage
+{
+  "name": "Current Storage",
+  "event_name": "storage_snapshot",
+  "aggregation": {
+    "type": "LATEST",
+    "field": "bytes"
+  }
+}
+```
+
+```json Active Licenses
+{
+  "name": "Active License Count",
+  "event_name": "license_check",
+  "aggregation": {
+    "type": "LATEST",
+    "field": "count"
+  }
+}
+```
+</CodeGroup>
+
+### Example
+
+**Events:**
+```json
+{"timestamp": "2024-03-20T10:00:00Z", "properties": {"bytes": 1000}}
+{"timestamp": "2024-03-20T11:00:00Z", "properties": {"bytes": 2000}}
+{"timestamp": "2024-03-20T12:00:00Z", "properties": {"bytes": 1500}}
+```
+
+**Result:** `1500` (latest value)
+
+## AVG
+
+Calculates the average value from a specified event property.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "AVG",
+    "field": "property_name"
+  }
+}
+```
+
+### Use Cases
+
+<CodeGroup>
+```json Average Response Time
+{
+  "name": "Avg Response Time",
+  "event_name": "api_request",
+  "aggregation": {
+    "type": "AVG",
+    "field": "response_time_ms"
+  }
+}
+```
+
+```json Average Order Value
+{
+  "name": "Avg Order Value",
+  "event_name": "order_placed",
+  "aggregation": {
+    "type": "AVG",
+    "field": "total_amount"
+  }
+}
+```
+</CodeGroup>
+
+### Example
+
+**Events:**
+```json
+{"properties": {"response_time_ms": 100}}
+{"properties": {"response_time_ms": 200}}
+{"properties": {"response_time_ms": 150}}
+```
+
+**Result:** `150` ((100 + 200 + 150) / 3)
+
+## COUNT_UNIQUE
+
+Counts the number of distinct values for a specified event property.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "COUNT_UNIQUE",
+    "field": "property_name"
+  }
+}
+```
+
+### Use Cases
+
+<CodeGroup>
+```json Active Users
+{
+  "name": "Monthly Active Users",
+  "event_name": "user_activity",
+  "aggregation": {
+    "type": "COUNT_UNIQUE",
+    "field": "user_id"
+  }
+}
+```
+
+```json Unique IPs
+{
+  "name": "Unique IP Addresses",
+  "event_name": "api_request",
+  "aggregation": {
+    "type": "COUNT_UNIQUE",
+    "field": "ip_address"
+  }
+}
+```
+
+```json Unique Devices
+{
+  "name": "Active Devices",
+  "event_name": "device_sync",
+  "aggregation": {
+    "type": "COUNT_UNIQUE",
+    "field": "device_id"
+  }
+}
+```
+</CodeGroup>
+
+### Example
+
+**Events:**
+```json
+{"properties": {"user_id": "user_1"}}
+{"properties": {"user_id": "user_2"}}
+{"properties": {"user_id": "user_1"}}
+{"properties": {"user_id": "user_3"}}
+```
+
+**Result:** `3` (unique users: user_1, user_2, user_3)
+
+## SUM_WITH_MULTIPLIER
+
+Sums values and applies a multiplier for unit conversion.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "SUM_WITH_MULTIPLIER",
+    "field": "property_name",
+    "multiplier": "0.001"
+  }
+}
+```
+
+### Use Cases
+
+<CodeGroup>
+```json Seconds to Hours
+{
+  "name": "Compute Hours",
+  "event_name": "compute_usage",
+  "aggregation": {
+    "type": "SUM_WITH_MULTIPLIER",
+    "field": "duration_seconds",
+    "multiplier": "0.000277778"
+  }
+}
+```
+
+```json Bytes to GB
+{
+  "name": "Data Transfer (GB)",
+  "event_name": "data_transfer",
+  "aggregation": {
+    "type": "SUM_WITH_MULTIPLIER",
+    "field": "bytes",
+    "multiplier": "0.000000001"
+  }
+}
+```
+
+```json Milliseconds to Seconds
+{
+  "name": "Total Duration (s)",
+  "event_name": "task_completed",
+  "aggregation": {
+    "type": "SUM_WITH_MULTIPLIER",
+    "field": "duration_ms",
+    "multiplier": "0.001"
+  }
+}
+```
+</CodeGroup>
+
+### Example
+
+**Events:**
+```json
+{"properties": {"duration_seconds": 3600}}
+{"properties": {"duration_seconds": 7200}}
+{"properties": {"duration_seconds": 1800}}
+```
+
+**Calculation:**
+- Sum: 12,600 seconds
+- Multiplier: 0.000277778 (seconds to hours)
+- **Result: 3.5 hours**
+
+## WEIGHTED_SUM
+
+Calculates a weighted sum for complex multi-factor pricing.
+
+### Configuration
+
+```json
+{
+  "aggregation": {
+    "type": "WEIGHTED_SUM",
+    "field": "base_value"
+  }
+}
+```
+
+<Note>
+WEIGHTED_SUM is an advanced aggregation type. Contact FlexPrice support for implementation guidance.
+</Note>
+
+## Custom Expressions
+
+For complex calculations, use CEL expressions instead of specifying a field:
+
+```json
+{
+  "aggregation": {
+    "type": "SUM",
+    "expression": "cpu_cores * memory_gb * duration_seconds"
+  }
+}
+```
+
+### Expression Examples
+
+<CodeGroup>
+```cel Multi-Factor Compute
+cpu_cores * memory_gb * duration_seconds / 3600
+```
+
+```cel AI Token Pricing
+input_tokens * 0.001 + output_tokens * 0.002
+```
+
+```cel Tiered Calculation
+bytes > 1000000000 ? bytes * 0.05 : bytes * 0.10
+```
+
+```cel Complex Formula
+(tokens * duration * multiplier) / 1000000
+```
+</CodeGroup>
+
+**Available in expressions:**
+- All event properties
+- Standard operators: `+`, `-`, `*`, `/`, `%`
+- Comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- Ternary: `condition ? true_value : false_value`
+
+## Time Windows
+
+Certain aggregations support time-based bucketing:
+
+| Window Size | Duration | Use Case |
+|-------------|----------|----------|
+| `HOUR` | 60 minutes | Real-time metrics, API rate limits |
+| `DAY` | 24 hours | Daily peaks, business day metrics |
+| `WEEK` | 7 days | Weekly capacity planning |
+| `MONTH` | Calendar month | Monthly billing periods |
+
+### Bucket Size Best Practices
+
+<Steps>
+  <Step title="Match Billing Granularity">
+    Use bucket sizes that align with your pricing model (e.g., hourly for cloud compute).
+  </Step>
+  
+  <Step title="Balance Accuracy vs Performance">
+    Smaller buckets are more accurate but require more storage and computation.
+  </Step>
+  
+  <Step title="Consider Customer Behavior">
+    Choose windows that reflect how customers use your product.
+  </Step>
+</Steps>
+
+## Choosing the Right Aggregation
+
+| If you want to... | Use |
+|-------------------|-----|
+| Count events | `COUNT` |
+| Sum numeric values | `SUM` or `SUM_WITH_MULTIPLIER` |
+| Track peak usage | `MAX` with `bucket_size` |
+| Measure current state | `LATEST` |
+| Calculate averages | `AVG` |
+| Count unique items | `COUNT_UNIQUE` |
+| Complex calculations | `SUM` with `expression` |
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate Event Data">
+    Ensure event properties contain valid numeric values for aggregation.
+  </Step>
+  
+  <Step title="Test Calculations">
+    Send test events and verify aggregated values match expectations.
+  </Step>
+  
+  <Step title="Use Appropriate Types">
+    Match aggregation type to your pricing model (COUNT for per-unit, SUM for consumption, MAX for capacity).
+  </Step>
+  
+  <Step title="Consider Reset Behavior">
+    Pair aggregation type with appropriate reset behavior (BILLING_PERIOD vs NEVER).
+  </Step>
+  
+  <Step title="Document Custom Logic">
+    If using expressions or multipliers, document the calculation for your team.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Meters" icon="gauge" href="/metering/meters">
+    Create meters using these aggregations
+  </Card>
+  
+  <Card title="Send Events" icon="upload" href="/metering/events">
+    Start sending events to track
+  </Card>
+  
+  <Card title="Query Usage" icon="chart-line" href="/api-reference/events/get-usage-by-meter">
+    Retrieve aggregated usage data
+  </Card>
+  
+  <Card title="Connect Pricing" icon="dollar-sign" href="/pricing/overview">
+    Link aggregated usage to prices
+  </Card>
+</CardGroup>

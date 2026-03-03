@@ -1,0 +1,541 @@
+---
+title: Credit Grants
+description: Automatically allocate credits to customers through plans or subscriptions
+---
+
+## Overview
+
+Credit grants define how credits are allocated to customers. They can be attached to plans (applying to all subscriptions) or directly to individual subscriptions for custom allocations.
+
+## Grant Scope
+
+Credit grants operate at two scopes:
+
+### Plan-Scoped Grants
+
+**Scope:** `PLAN`
+
+Applied automatically when a customer subscribes to a plan. These are template grants that define what every subscriber receives.
+
+**Characteristics:**
+- Defined at the plan level
+- Applied to all new subscriptions
+- Cannot have `start_date` or `end_date` (uses subscription dates)
+- Requires `plan_id`
+
+**Use cases:**
+- Onboarding credits for all new customers
+- Monthly credit allowances included in a plan
+- Trial credits for freemium plans
+
+### Subscription-Scoped Grants
+
+**Scope:** `SUBSCRIPTION`
+
+Applied directly to a specific subscription, allowing custom credit allocations.
+
+**Characteristics:**
+- Defined for a specific subscription
+- Requires `subscription_id` and `start_date`
+- Optional `end_date` to limit grant duration
+- Can include `credit_grant_anchor` for custom billing alignment
+
+**Use cases:**
+- One-time promotional credits for a specific customer
+- Custom credit packages as part of negotiations
+- Compensation credits
+
+## Credit Grant Properties
+
+### Core Fields
+
+```json
+{
+  "name": "Monthly Platform Credits",
+  "scope": "PLAN",
+  "plan_id": "plan_1234567890",
+  "credits": "1000.00",
+  "cadence": "RECURRING",
+  "period": "MONTHLY",
+  "period_count": 1,
+  "expiration_type": "BILLING_CYCLE",
+  "priority": 1
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Descriptive name for the grant |
+| `scope` | string | Yes | `PLAN` or `SUBSCRIPTION` |
+| `plan_id` | string | Conditional | Required for plan-scoped grants |
+| `subscription_id` | string | Conditional | Required for subscription-scoped grants |
+| `credits` | decimal | Yes | Amount of credits to grant |
+| `cadence` | string | Yes | `ONETIME` or `RECURRING` |
+| `expiration_type` | string | Yes | How credits expire (see below) |
+
+### Conversion Rates
+
+Grants can specify conversion rates to override wallet defaults:
+
+```json
+{
+  "credits": "500.00",
+  "conversion_rate": "1.0",
+  "topup_conversion_rate": "1.0"
+}
+```
+
+- If not specified, uses the target wallet's conversion rates
+- Allows grants to have different credit value than wallet default
+
+## Grant Cadence
+
+### One-Time Grants
+
+**Cadence:** `ONETIME`
+
+Credits are granted once when the subscription starts or the grant is created.
+
+```json
+{
+  "name": "Welcome Bonus",
+  "scope": "PLAN",
+  "plan_id": "plan_1234567890",
+  "credits": "100.00",
+  "cadence": "ONETIME",
+  "expiration_type": "DURATION",
+  "expiration_duration": 30,
+  "expiration_duration_unit": "DAY"
+}
+```
+
+<Note>
+One-time grants do not require `period` or `period_count` fields.
+</Note>
+
+### Recurring Grants
+
+**Cadence:** `RECURRING`
+
+Credits are granted repeatedly based on the specified period.
+
+```json
+{
+  "name": "Monthly Credit Allowance",
+  "scope": "PLAN",
+  "plan_id": "plan_1234567890",
+  "credits": "1000.00",
+  "cadence": "RECURRING",
+  "period": "MONTHLY",
+  "period_count": 1,
+  "expiration_type": "BILLING_CYCLE"
+}
+```
+
+**Period options:**
+- `DAILY`
+- `WEEKLY`
+- `MONTHLY`
+- `QUARTERLY`
+- `HALF_YEARLY`
+- `ANNUAL`
+
+**Period count:** How many periods the grant remains active. For unlimited duration, you can set a high number or omit `end_date`.
+
+## Credit Expiration
+
+Expiration policies determine when granted credits become unavailable:
+
+### Never Expire
+
+**Type:** `NEVER`
+
+Credits remain available until fully consumed.
+
+```json
+{
+  "expiration_type": "NEVER"
+}
+```
+
+**Use case:** Purchased credit packages that customers should use at their own pace.
+
+### Duration-Based Expiration
+
+**Type:** `DURATION`
+
+Credits expire after a fixed time period from when they're granted.
+
+```json
+{
+  "expiration_type": "DURATION",
+  "expiration_duration": 90,
+  "expiration_duration_unit": "DAY"
+}
+```
+
+**Duration units:**
+- `DAY`
+- `WEEK`
+- `MONTH`
+- `YEAR`
+
+**Use case:** Promotional credits that should encourage usage within a timeframe.
+
+<Warning>
+Duration starts from when credits are granted, not from subscription start.
+</Warning>
+
+### Billing Cycle Expiration
+
+**Type:** `BILLING_CYCLE`
+
+Credits expire at the end of the customer's billing period.
+
+```json
+{
+  "expiration_type": "BILLING_CYCLE"
+}
+```
+
+**Use case:** "Use it or lose it" monthly allowances that reset each billing cycle.
+
+<Note>
+Billing cycle expiration aligns with the subscription's billing schedule, not calendar months.
+</Note>
+
+## Creating Credit Grants
+
+<Steps>
+
+<Step title="Create a plan-scoped grant">
+
+Define credits that all plan subscribers receive:
+
+```json
+POST /v1/credit-grants
+{
+  "name": "Pro Plan Monthly Credits",
+  "scope": "PLAN",
+  "plan_id": "plan_pro_monthly",
+  "credits": "5000.00",
+  "cadence": "RECURRING",
+  "period": "MONTHLY",
+  "period_count": 12,
+  "expiration_type": "BILLING_CYCLE",
+  "priority": 10
+}
+```
+
+This grant will automatically apply to all subscriptions created from this plan.
+
+</Step>
+
+<Step title="Create a subscription-scoped grant">
+
+Allocate custom credits to a specific subscription:
+
+```json
+POST /v1/credit-grants
+{
+  "name": "Enterprise Customer Bonus",
+  "scope": "SUBSCRIPTION",
+  "subscription_id": "sub_1234567890",
+  "credits": "10000.00",
+  "cadence": "ONETIME",
+  "start_date": "2024-01-01T00:00:00Z",
+  "expiration_type": "DURATION",
+  "expiration_duration": 6,
+  "expiration_duration_unit": "MONTH",
+  "priority": 5
+}
+```
+
+</Step>
+
+<Step title="Verify grant application">
+
+Check that credits were added to the customer's wallet:
+
+```bash
+GET /v1/wallets?customer_id=cust_1234567890
+```
+
+Look for transactions with `transaction_reason` of `SUBSCRIPTION_CREDIT_GRANT` or `FREE_CREDIT_GRANT`.
+
+</Step>
+
+</Steps>
+
+## Grant Application Flow
+
+### Plan-Scoped Application
+
+1. Customer subscribes to a plan with credit grants
+2. Subscription is created
+3. FlexPrice identifies all active plan-scoped grants
+4. Grant applications are scheduled based on cadence
+5. Credits are added to customer's wallet at scheduled time
+
+### Subscription-Scoped Application
+
+1. Credit grant is created with `subscription_id`
+2. Grant application is scheduled for `start_date`
+3. At scheduled time, credits are added to wallet
+4. For recurring grants, next application is scheduled
+5. Applications continue until `end_date` or subscription ends
+
+## Grant Applications
+
+Each grant creates credit grant applications - scheduled events that add credits to wallets:
+
+```json
+{
+  "id": "cga_1234567890",
+  "credit_grant_id": "crg_1234567890",
+  "subscription_id": "sub_1234567890",
+  "scheduled_for": "2024-02-01T00:00:00Z",
+  "period_start": "2024-02-01T00:00:00Z",
+  "period_end": "2024-03-01T00:00:00Z",
+  "application_status": "COMPLETED",
+  "credits": "1000.00"
+}
+```
+
+**Application statuses:**
+- `PENDING` - Scheduled, not yet executed
+- `COMPLETED` - Successfully added credits to wallet
+- `FAILED` - Application failed (will retry)
+- `SKIPPED` - Skipped due to subscription status
+
+### Processing Applications
+
+Applications are processed automatically via cron job:
+
+```bash
+POST /v1/cron/process-scheduled-credit-grant-applications
+```
+
+This endpoint:
+- Finds all pending applications scheduled for now or earlier
+- Applies credits to customer wallets
+- Creates wallet transactions
+- Updates application status
+- Schedules next application for recurring grants
+
+## Grant Priority
+
+The `priority` field controls which credits are consumed first:
+
+```json
+{
+  "priority": 1  // Lower number = higher priority (used first)
+}
+```
+
+**Usage order:**
+1. Credits with lowest priority number
+2. If priority is the same, credits expiring soonest
+3. If both are the same, oldest credits first (FIFO)
+
+**Example scenario:**
+- Priority 1: Promotional credits (use first)
+- Priority 5: Plan-included credits
+- Priority 10: Purchased credits (use last)
+
+<Note>
+If `priority` is null, credits are ordered by expiry date and creation time only.
+</Note>
+
+## Managing Grants
+
+### Update Grant Metadata
+
+Only `name` and `metadata` can be updated after creation:
+
+```json
+PATCH /v1/credit-grants/{grant_id}
+{
+  "name": "Updated Grant Name",
+  "metadata": {
+    "campaign": "Q1-2024",
+    "source": "promotional"
+  }
+}
+```
+
+<Warning>
+Grant parameters like `credits`, `cadence`, `period`, and `expiration_type` cannot be modified after creation. Create a new grant instead.
+</Warning>
+
+### Delete or End a Grant
+
+For **plan-scoped grants**, deletion removes the grant from the plan:
+
+```bash
+DELETE /v1/credit-grants/{grant_id}
+```
+
+For **subscription-scoped grants**, you can set an effective end date:
+
+```json
+DELETE /v1/credit-grants/{grant_id}
+{
+  "effective_date": "2024-06-30T23:59:59Z"
+}
+```
+
+This prevents future applications while allowing already-scheduled applications to complete.
+
+### Cancel Future Applications
+
+Cancel all pending applications for a subscription:
+
+```json
+POST /v1/credit-grants/cancel-future-grants
+{
+  "subscription_id": "sub_1234567890",
+  "effective_date": "2024-06-01T00:00:00Z"
+}
+```
+
+## Prepaid vs Promotional Credits
+
+While the wallet system distinguishes between purchased and free credits, grant configuration determines the nature:
+
+### Promotional/Free Credits
+
+Use transaction reason `FREE_CREDIT_GRANT` or `SUBSCRIPTION_CREDIT_GRANT`:
+
+```json
+{
+  "credits": "500.00",
+  "expiration_type": "DURATION",
+  "expiration_duration": 30,
+  "expiration_duration_unit": "DAY"
+}
+```
+
+**Characteristics:**
+- Typically have expiration dates
+- Higher priority for consumption
+- Not refundable
+- Shown separately in `credits_available_breakdown.free`
+
+### Prepaid/Purchased Credits
+
+Purchased credits usually go directly to wallets via top-up, not grants:
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "1000.00",
+  "transaction_reason": "PURCHASED_CREDIT_DIRECT",
+  "expiration_type": "NEVER"
+}
+```
+
+**Characteristics:**
+- Rarely expire
+- Lower priority (use promotional credits first)
+- May be refundable
+- Shown in `credits_available_breakdown.purchased`
+
+## Best Practices
+
+### Grant Naming
+
+- Use descriptive names: "Pro Plan Monthly Allowance" not "Grant 1"
+- Include period for recurring grants: "Quarterly Platform Credits"
+- Specify if promotional: "Q1 2024 Bonus Credits"
+
+### Expiration Strategy
+
+- **Plan credits:** Use `BILLING_CYCLE` to create urgency and predictable resets
+- **Promotional credits:** Use `DURATION` with 30-90 days to encourage adoption
+- **Purchased credits:** Use `NEVER` or very long duration (1+ years)
+
+### Priority Assignment
+
+- Promotional credits: Priority 1-5 (consume first)
+- Plan-included credits: Priority 5-10
+- Purchased credits: Priority 10+ (preserve longest)
+
+### Testing Grants
+
+1. Create a test plan with a grant
+2. Create a test subscription
+3. Verify grant application was scheduled
+4. Manually trigger application processing
+5. Check wallet transactions
+6. Verify credits are available with correct expiry
+
+## Common Patterns
+
+### Freemium Trial Credits
+
+```json
+{
+  "name": "Free Trial Credits",
+  "scope": "PLAN",
+  "plan_id": "plan_free_trial",
+  "credits": "100.00",
+  "cadence": "ONETIME",
+  "expiration_type": "DURATION",
+  "expiration_duration": 14,
+  "expiration_duration_unit": "DAY",
+  "priority": 1
+}
+```
+
+### Monthly Allowance with Rollover
+
+```json
+{
+  "name": "Enterprise Monthly Allowance",
+  "scope": "PLAN",
+  "plan_id": "plan_enterprise",
+  "credits": "10000.00",
+  "cadence": "RECURRING",
+  "period": "MONTHLY",
+  "period_count": 12,
+  "expiration_type": "DURATION",
+  "expiration_duration": 3,
+  "expiration_duration_unit": "MONTH",
+  "priority": 5
+}
+```
+
+### Onboarding Bonus
+
+```json
+{
+  "name": "New Customer Welcome Bonus",
+  "scope": "SUBSCRIPTION",
+  "subscription_id": "sub_1234567890",
+  "credits": "500.00",
+  "cadence": "ONETIME",
+  "start_date": "2024-01-01T00:00:00Z",
+  "expiration_type": "DURATION",
+  "expiration_duration": 90,
+  "expiration_duration_unit": "DAY",
+  "priority": 1
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallets" icon="wallet" href="/credits/wallets">
+    Learn about wallet management
+  </Card>
+  <Card title="Auto Top-Up" icon="rotate" href="/credits/top-ups">
+    Configure automatic credit replenishment
+  </Card>
+  <Card title="Expiration" icon="clock" href="/credits/expiration">
+    Manage credit expiration policies
+  </Card>
+  <Card title="Plans" icon="layer-group" href="/plans/overview">
+    Create plans with credit grants
+  </Card>
+</CardGroup>

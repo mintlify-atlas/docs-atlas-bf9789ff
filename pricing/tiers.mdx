@@ -1,0 +1,576 @@
+---
+title: 'Tiered Pricing'
+description: 'Implement volume-based and graduated pricing models'
+---
+
+## Overview
+
+Tiered pricing allows you to charge different rates based on usage volume. FlexPrice supports two tier modes: **Volume** pricing (all units at one rate) and **Slab** pricing (graduated rates).
+
+## Tier Modes
+
+<CardGroup cols={2}>
+  <Card title="Volume" icon="layer-group">
+    All units priced at the tier reached
+  </Card>
+  <Card title="Slab" icon="stairs">
+    Units priced progressively across tiers
+  </Card>
+</CardGroup>
+
+### Volume Pricing
+
+In volume pricing, once you reach a tier, **all units** are charged at that tier's rate.
+
+```json Volume Pricing Example
+{
+  "billing_model": "TIERED",
+  "tier_mode": "VOLUME",
+  "currency": "usd",
+  "tiers": [
+    {
+      "up_to": 100,
+      "unit_amount": "1.00"
+    },
+    {
+      "up_to": 1000,
+      "unit_amount": "0.50"
+    },
+    {
+      "up_to": null,
+      "unit_amount": "0.25"
+    }
+  ]
+}
+```
+
+<Tabs>
+  <Tab title="50 Units">
+    **Tier:** 1 (≤100)
+    
+    **Calculation:**
+    ```
+    50 units × $1.00 = $50.00
+    ```
+    
+    All 50 units at $1.00/unit.
+  </Tab>
+
+  <Tab title="500 Units">
+    **Tier:** 2 (≤1,000)
+    
+    **Calculation:**
+    ```
+    500 units × $0.50 = $250.00
+    ```
+    
+    All 500 units at $0.50/unit (tier 2 rate).
+  </Tab>
+
+  <Tab title="1,500 Units">
+    **Tier:** 3 (>1,000)
+    
+    **Calculation:**
+    ```
+    1,500 units × $0.25 = $375.00
+    ```
+    
+    All 1,500 units at $0.25/unit (tier 3 rate).
+  </Tab>
+</Tabs>
+
+**Key Characteristic:** The tier you reach determines the price for **every unit**, not just the units in that tier.
+
+**Use Cases:**
+- Wholesale pricing (bulk discounts)
+- Volume licensing
+- Tier-based SaaS pricing ("Professional" vs "Enterprise" rates)
+
+### Slab Pricing (Graduated)
+
+In slab pricing, units are charged **progressively**. Each tier has its own rate, and you pay tier 1 rates for tier 1 units, tier 2 rates for tier 2 units, etc.
+
+```json Slab Pricing Example
+{
+  "billing_model": "TIERED",
+  "tier_mode": "SLAB",
+  "currency": "usd",
+  "tiers": [
+    {
+      "up_to": 1000,
+      "unit_amount": "0.00"
+    },
+    {
+      "up_to": 10000,
+      "unit_amount": "0.10"
+    },
+    {
+      "up_to": null,
+      "unit_amount": "0.05"
+    }
+  ]
+}
+```
+
+<Tabs>
+  <Tab title="500 Units">
+    **Tiers Used:** 1
+    
+    **Calculation:**
+    ```
+    Tier 1: 500 units × $0.00 = $0.00
+    Total: $0.00
+    ```
+    
+    All units fall within the free tier.
+  </Tab>
+
+  <Tab title="5,000 Units">
+    **Tiers Used:** 1 + 2
+    
+    **Calculation:**
+    ```
+    Tier 1: 1,000 units × $0.00 = $0.00
+    Tier 2: 4,000 units × $0.10 = $400.00
+    Total: $400.00
+    ```
+    
+    First 1,000 are free, next 4,000 at $0.10/unit.
+  </Tab>
+
+  <Tab title="15,000 Units">
+    **Tiers Used:** 1 + 2 + 3
+    
+    **Calculation:**
+    ```
+    Tier 1: 1,000 units × $0.00 = $0.00
+    Tier 2: 9,000 units × $0.10 = $900.00
+    Tier 3: 5,000 units × $0.05 = $250.00
+    Total: $1,150.00
+    ```
+    
+    Each tier priced separately and summed.
+  </Tab>
+</Tabs>
+
+**Key Characteristic:** Units are "sliced" into tiers. Each tier's units are priced independently.
+
+**Use Cases:**
+- Utility billing (electricity, water)
+- Pay-as-you-grow SaaS (free tier + paid tiers)
+- API pricing with included quota
+
+## Tier Structure
+
+### Tier Fields
+
+<ParamField path="up_to" type="integer">
+  Inclusive upper boundary of the tier. Set to `null` for the final tier (infinity).
+</ParamField>
+
+<ParamField path="unit_amount" type="decimal" required>
+  Price per unit within this tier (in major currency units)
+</ParamField>
+
+<ParamField path="flat_amount" type="decimal">
+  Optional flat fee applied to this tier (in addition to unit_amount × quantity)
+</ParamField>
+
+<Note>
+**Tier Boundaries are Inclusive**: If `up_to` is 1000, a quantity of exactly 1000 belongs to this tier, not the next one.
+</Note>
+
+### Tier Ordering
+
+Tiers must be ordered from lowest to highest:
+
+```json Correct Order
+[
+  {"up_to": 100, "unit_amount": "1.00"},
+  {"up_to": 1000, "unit_amount": "0.75"},
+  {"up_to": null, "unit_amount": "0.50"}
+]
+```
+
+**Rules:**
+- First tier starts at 0 (implicit)
+- Each `up_to` must be greater than the previous
+- Last tier has `up_to: null` (covers all remaining units)
+
+## Flat Amounts in Tiers
+
+Add a fixed fee to any tier using `flat_amount`:
+
+```json Tier with Flat Fee
+{
+  "tiers": [
+    {
+      "up_to": 100,
+      "unit_amount": "1.00",
+      "flat_amount": "50.00"
+    },
+    {
+      "up_to": null,
+      "unit_amount": "0.50",
+      "flat_amount": "25.00"
+    }
+  ]
+}
+```
+
+**Calculation Formula:**
+```
+Tier Cost = (quantity × unit_amount) + flat_amount
+```
+
+<Tabs>
+  <Tab title="50 Units (Volume)">
+    Tier 1 (≤100): 
+    ```
+    (50 × $1.00) + $50.00 = $100.00
+    ```
+  </Tab>
+
+  <Tab title="500 Units (Volume)">
+    Tier 2 (>100):
+    ```
+    (500 × $0.50) + $25.00 = $275.00
+    ```
+  </Tab>
+
+  <Tab title="500 Units (Slab)">
+    ```
+    Tier 1: (100 × $1.00) + $50.00 = $150.00
+    Tier 2: (400 × $0.50) + $25.00 = $225.00
+    Total: $375.00
+    ```
+  </Tab>
+</Tabs>
+
+**Use Cases:**
+- Base fee + per-unit pricing ("$50 + $1/unit")
+- Tiered platform fees
+- Connection fees + usage charges
+
+## Complete Examples
+
+<AccordionGroup>
+  <Accordion title="SaaS API Pricing (Slab)">
+    Free tier with graduated pricing for overages.
+
+    ```json
+    {
+      "display_name": "API Requests",
+      "type": "USAGE",
+      "billing_model": "TIERED",
+      "tier_mode": "SLAB",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "currency": "usd",
+      "meter_id": "meter_api_calls",
+      "tiers": [
+        {
+          "up_to": 10000,
+          "unit_amount": "0.00"
+        },
+        {
+          "up_to": 100000,
+          "unit_amount": "0.001"
+        },
+        {
+          "up_to": 1000000,
+          "unit_amount": "0.0005"
+        },
+        {
+          "up_to": null,
+          "unit_amount": "0.0001"
+        }
+      ]
+    }
+    ```
+
+    **Pricing Breakdown:**
+    - First 10K calls: Free
+    - 10K - 100K: $0.001/call
+    - 100K - 1M: $0.0005/call
+    - 1M+: $0.0001/call
+
+    **Example (250,000 calls):**
+    ```
+    Tier 1: 10,000 × $0.00 = $0.00
+    Tier 2: 90,000 × $0.001 = $90.00
+    Tier 3: 150,000 × $0.0005 = $75.00
+    Total: $165.00
+    ```
+  </Accordion>
+
+  <Accordion title="Cloud Storage (Volume)">
+    All storage charged at the tier rate based on total usage.
+
+    ```json
+    {
+      "display_name": "Storage",
+      "type": "USAGE",
+      "billing_model": "TIERED",
+      "tier_mode": "VOLUME",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "currency": "usd",
+      "meter_id": "meter_storage_gb",
+      "tiers": [
+        {
+          "up_to": 100,
+          "unit_amount": "0.10"
+        },
+        {
+          "up_to": 1000,
+          "unit_amount": "0.08"
+        },
+        {
+          "up_to": 10000,
+          "unit_amount": "0.06"
+        },
+        {
+          "up_to": null,
+          "unit_amount": "0.04"
+        }
+      ]
+    }
+    ```
+
+    **Pricing Breakdown:**
+    - 0-100 GB: $0.10/GB
+    - 101-1000 GB: $0.08/GB (all GB at this rate)
+    - 1001-10000 GB: $0.06/GB (all GB at this rate)
+    - 10001+ GB: $0.04/GB (all GB at this rate)
+
+    **Example (5,000 GB):**
+    ```
+    Tier: 3 (1,001-10,000)
+    5,000 GB × $0.06/GB = $300.00
+    ```
+  </Accordion>
+
+  <Accordion title="License Tiers (Volume with Flat Fee)">
+    Enterprise discount with base fee.
+
+    ```json
+    {
+      "display_name": "User Licenses",
+      "type": "FIXED",
+      "billing_model": "TIERED",
+      "tier_mode": "VOLUME",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "currency": "usd",
+      "tiers": [
+        {
+          "up_to": 10,
+          "unit_amount": "50.00",
+          "flat_amount": "0.00"
+        },
+        {
+          "up_to": 50,
+          "unit_amount": "40.00",
+          "flat_amount": "100.00"
+        },
+        {
+          "up_to": null,
+          "unit_amount": "30.00",
+          "flat_amount": "500.00"
+        }
+      ]
+    }
+    ```
+
+    **Pricing Breakdown:**
+    - 1-10 users: $50/user
+    - 11-50 users: $40/user + $100 base fee
+    - 51+ users: $30/user + $500 base fee
+
+    **Example (25 users):**
+    ```
+    Tier: 2 (11-50)
+    (25 × $40.00) + $100.00 = $1,100.00
+    ```
+  </Accordion>
+
+  <Accordion title="Compute Hours (Slab with Minimum)">
+    Graduated pricing with prepaid baseline.
+
+    ```json
+    {
+      "display_name": "Compute Hours",
+      "type": "USAGE",
+      "billing_model": "TIERED",
+      "tier_mode": "SLAB",
+      "billing_cadence": "RECURRING",
+      "billing_period": "MONTHLY",
+      "billing_period_count": 1,
+      "currency": "usd",
+      "meter_id": "meter_compute",
+      "tiers": [
+        {
+          "up_to": 100,
+          "unit_amount": "0.00",
+          "flat_amount": "50.00"
+        },
+        {
+          "up_to": 500,
+          "unit_amount": "0.50"
+        },
+        {
+          "up_to": null,
+          "unit_amount": "0.30"
+        }
+      ]
+    }
+    ```
+
+    **Pricing Breakdown:**
+    - First 100 hours: Included for $50 base fee
+    - 101-500 hours: $0.50/hour
+    - 501+ hours: $0.30/hour
+
+    **Example (300 hours):**
+    ```
+    Tier 1: 100 hours × $0.00 + $50.00 = $50.00
+    Tier 2: 200 hours × $0.50 = $100.00
+    Total: $150.00
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Choosing Between Volume and Slab
+
+<Tabs>
+  <Tab title="Use Volume When">
+    <Check>
+      You want to reward high-volume customers with better per-unit rates across all units
+    </Check>
+    <Check>
+      Pricing should be simple to understand: "Buy more, pay less per unit for everything"
+    </Check>
+    <Check>
+      You're selling licenses, seats, or products where bulk discounts make sense
+    </Check>
+    <Check>
+      Psychological pricing benefits: "Reach tier 2, save on all units!"
+    </Check>
+
+    **Examples:**
+    - Software licenses (100 licenses at $10/each vs 1000 at $7/each)
+    - Wholesale products
+    - Tiered subscription plans masquerading as usage
+  </Tab>
+
+  <Tab title="Use Slab When">
+    <Check>
+      You want to offer a free tier or included usage
+    </Check>
+    <Check>
+      Incremental costs should reflect incremental pricing
+    </Check>
+    <Check>
+      You're modeling utility-style billing (pay more as you use more)
+    </Check>
+    <Check>
+      Revenue should grow smoothly with usage
+    </Check>
+
+    **Examples:**
+    - API calls (first 10K free, then pay per call)
+    - Cloud resources (storage, bandwidth, compute)
+    - SMS/email sends
+    - Metered SaaS features
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Design Logical Tiers" icon="layer-group">
+    Space tiers to match customer growth patterns:
+    - Small: 0-100 (startups)
+    - Medium: 101-1,000 (growth)
+    - Large: 1,001-10,000 (scale)
+    - Enterprise: 10,001+ (custom)
+  </Card>
+
+  <Card title="Communicate Clearly" icon="comment">
+    In your UI, show how pricing works:
+    - Volume: "All units at $X when you reach tier Y"
+    - Slab: "First 1000 free, then $X per unit"
+  </Card>
+
+  <Card title="Test Edge Cases" icon="flask">
+    Verify calculations at tier boundaries:
+    - Quantity = `up_to` value (inclusive)
+    - Quantity = `up_to` + 1 (next tier)
+    - Zero quantity (should be valid)
+  </Card>
+
+  <Card title="Consider Predictability" icon="chart-line">
+    - Slab = predictable growth (no surprises)
+    - Volume = can jump significantly at tier boundaries
+  </Card>
+</CardGroup>
+
+<Warning>
+**Tier Boundaries Are Inclusive**: A quantity of 1000 with `up_to: 1000` belongs to that tier, not the next. This is consistent across both VOLUME and SLAB modes.
+</Warning>
+
+<Note>
+**Performance**: FlexPrice calculates tiered pricing efficiently. Even with complex tier structures, calculations are fast and accurate using `decimal.Decimal` for precision.
+</Note>
+
+## Custom Price Units with Tiers
+
+You can use tiered pricing with custom price units (credits, tokens, etc.):
+
+```json Tiered Credit Pricing
+{
+  "currency": "usd",
+  "price_unit_type": "CUSTOM",
+  "price_unit_id": "unit_credits",
+  "price_unit": "credits",
+  "billing_model": "TIERED",
+  "tier_mode": "SLAB",
+  "price_unit_tiers": [
+    {
+      "up_to": 1000,
+      "unit_amount": "1.00"
+    },
+    {
+      "up_to": null,
+      "unit_amount": "0.80"
+    }
+  ],
+  "conversion_rate": "1.00"
+}
+```
+
+**Use Case:** Charge in credits/tokens with volume discounts on the credit price.
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Prices" icon="dollar-sign" href="/pricing/prices">
+    Complete price configuration guide
+  </Card>
+
+  <Card title="Meters" icon="gauge" href="/usage/meters">
+    Track usage for tiered pricing
+  </Card>
+
+  <Card title="Plans" icon="rectangle-list" href="/pricing/plans">
+    Package tiered prices into plans
+  </Card>
+
+  <Card title="Transform Quantity" icon="calculator" href="/pricing/prices#transform-quantity">
+    Apply quantity transformations before tier calculations
+  </Card>
+</CardGroup>

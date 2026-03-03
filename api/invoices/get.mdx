@@ -1,0 +1,344 @@
+---
+title: "Get Invoice"
+api: "GET /v1/invoices/{id}"
+description: "Use when loading an invoice for display or editing (e.g. portal or reconciliation). Supports group_by for usage breakdown and force_runtime_recalculation."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the invoice to retrieve
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="group_by" type="array">
+  Group usage breakdown by specified fields (e.g., source, feature_id, properties.org_id)
+  
+  Can be provided multiple times to group by multiple dimensions:
+  - `?group_by=source`
+  - `?group_by=source&group_by=feature_id`
+  - `?group_by=properties.org_id` (for nested properties)
+</ParamField>
+
+<ParamField query="force_runtime_recalculation" type="boolean" default="false">
+  Force recalculation of usage breakdown at runtime instead of using cached values
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the invoice
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  ID of the customer this invoice belongs to
+</ResponseField>
+
+<ResponseField name="subscription_id" type="string">
+  ID of the subscription (if applicable)
+</ResponseField>
+
+<ResponseField name="invoice_number" type="string">
+  Human-readable invoice number
+</ResponseField>
+
+<ResponseField name="invoice_type" type="string">
+  Type of invoice
+  
+  **Values:** `SUBSCRIPTION`, `ONE_TIME`, `CREDIT`, `PRORATION`
+</ResponseField>
+
+<ResponseField name="invoice_status" type="string">
+  Current status of the invoice
+  
+  **Values:** `DRAFT`, `FINALIZED`, `VOIDED`, `UNCOLLECTIBLE`
+</ResponseField>
+
+<ResponseField name="payment_status" type="string">
+  Payment status
+  
+  **Values:** `PENDING`, `PAID`, `UNPAID`, `PARTIALLY_PAID`, `OVERPAID`, `FAILED`
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Three-letter ISO currency code (e.g., USD, EUR)
+</ResponseField>
+
+<ResponseField name="amount_due" type="string">
+  Total amount due
+</ResponseField>
+
+<ResponseField name="amount_paid" type="string">
+  Amount already paid
+</ResponseField>
+
+<ResponseField name="amount_remaining" type="string">
+  Remaining amount to be paid
+</ResponseField>
+
+<ResponseField name="subtotal" type="string">
+  Subtotal before taxes and discounts
+</ResponseField>
+
+<ResponseField name="total_tax" type="string">
+  Total tax amount
+</ResponseField>
+
+<ResponseField name="total_discount" type="string">
+  Total discount amount
+</ResponseField>
+
+<ResponseField name="total" type="string">
+  Final total amount
+</ResponseField>
+
+<ResponseField name="total_prepaid_credits_applied" type="string">
+  Total prepaid credits applied to this invoice
+</ResponseField>
+
+<ResponseField name="due_date" type="string">
+  Date when payment is due (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="period_start" type="string">
+  Start of billing period (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="period_end" type="string">
+  End of billing period (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="billing_period" type="string">
+  Billing period (MONTHLY, YEARLY, etc.)
+</ResponseField>
+
+<ResponseField name="billing_reason" type="string">
+  Reason for invoice creation
+</ResponseField>
+
+<ResponseField name="line_items" type="array">
+  Array of line items included in the invoice
+  
+  <Expandable title="Line item object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the line item
+    </ResponseField>
+    
+    <ResponseField name="price_id" type="string">
+      ID of the price associated with this line item
+    </ResponseField>
+    
+    <ResponseField name="display_name" type="string">
+      Human-readable name for this line item
+    </ResponseField>
+    
+    <ResponseField name="amount" type="string">
+      Monetary amount for this line item
+    </ResponseField>
+    
+    <ResponseField name="quantity" type="string">
+      Quantity of units
+    </ResponseField>
+    
+    <ResponseField name="period_start" type="string">
+      Start date of the period this line item covers
+    </ResponseField>
+    
+    <ResponseField name="period_end" type="string">
+      End date of the period this line item covers
+    </ResponseField>
+    
+    <ResponseField name="prepaid_credits_applied" type="string">
+      Amount in invoice currency reduced from this line item due to prepaid credits
+    </ResponseField>
+    
+    <ResponseField name="line_item_discount" type="string">
+      Discount applied directly to this line item
+    </ResponseField>
+    
+    <ResponseField name="invoice_level_discount" type="string">
+      Invoice-level discount allocated to this line item
+    </ResponseField>
+    
+    <ResponseField name="usage_breakdown" type="array">
+      Flexible usage breakdown supporting any grouping (only if group_by is specified)
+      
+      <Expandable title="Usage breakdown item">
+        <ResponseField name="cost" type="string">
+          Cost attributed to this group
+        </ResponseField>
+        
+        <ResponseField name="usage" type="string">
+          Total usage amount from this group
+        </ResponseField>
+        
+        <ResponseField name="percentage" type="string">
+          Percentage of total line item cost from this group
+        </ResponseField>
+        
+        <ResponseField name="event_count" type="integer">
+          Number of events from this group
+        </ResponseField>
+        
+        <ResponseField name="grouped_by" type="object">
+          The grouping field values (e.g., source: api, org_id: org123)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="customer" type="object">
+  Customer information
+</ResponseField>
+
+<ResponseField name="subscription" type="object">
+  Subscription information (if applicable)
+</ResponseField>
+
+<ResponseField name="taxes" type="array">
+  Tax records applied to this invoice
+</ResponseField>
+
+<ResponseField name="coupon_applications" type="array">
+  Coupon applications for this invoice
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata key-value pairs
+</ResponseField>
+
+<ResponseField name="invoice_pdf_url" type="string">
+  URL where customers can download the PDF version of this invoice
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Timestamp when invoice was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  Timestamp when invoice was last updated
+</ResponseField>
+
+<ResponseField name="finalized_at" type="string">
+  Timestamp when invoice was finalized
+</ResponseField>
+
+<ResponseField name="paid_at" type="string">
+  Timestamp when invoice was paid
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.flexprice.io/v1/invoices/inv_1234567890" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL (with usage breakdown)
+curl -X GET "https://api.flexprice.io/v1/invoices/inv_1234567890?group_by=source&group_by=feature_id" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+invoice = client.invoices.get("inv_1234567890")
+
+# With usage breakdown
+invoice = client.invoices.get(
+    "inv_1234567890",
+    group_by=["source", "feature_id"]
+)
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+const invoice = await client.invoices.get("inv_1234567890");
+
+// With usage breakdown
+const invoice = await client.invoices.get("inv_1234567890", {
+  groupBy: ["source", "feature_id"]
+});
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+invoice, err := client.Invoices.Get(context.Background(), "inv_1234567890", nil)
+
+// With usage breakdown
+invoice, err := client.Invoices.Get(context.Background(), "inv_1234567890", &flexprice.InvoiceGetParams{
+    GroupBy: []string{"source", "feature_id"},
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "id": "inv_1234567890",
+  "customer_id": "cust_1234",
+  "subscription_id": "sub_5678",
+  "invoice_number": "INV-2024-0001",
+  "invoice_type": "SUBSCRIPTION",
+  "invoice_status": "FINALIZED",
+  "payment_status": "PAID",
+  "currency": "usd",
+  "amount_due": "100.00",
+  "amount_paid": "100.00",
+  "amount_remaining": "0.00",
+  "subtotal": "100.00",
+  "total_tax": "0.00",
+  "total_discount": "0.00",
+  "total": "100.00",
+  "total_prepaid_credits_applied": "0.00",
+  "due_date": "2024-02-01T00:00:00Z",
+  "period_start": "2024-01-01T00:00:00Z",
+  "period_end": "2024-01-31T23:59:59Z",
+  "billing_period": "MONTHLY",
+  "billing_reason": "subscription_cycle",
+  "line_items": [
+    {
+      "id": "li_abcd1234",
+      "price_id": "price_xyz",
+      "display_name": "API Calls",
+      "amount": "100.00",
+      "quantity": "1000.00",
+      "period_start": "2024-01-01T00:00:00Z",
+      "period_end": "2024-01-31T23:59:59Z",
+      "prepaid_credits_applied": "0.00",
+      "line_item_discount": "0.00",
+      "invoice_level_discount": "0.00",
+      "usage_breakdown": [
+        {
+          "cost": "60.00",
+          "usage": "600.00",
+          "percentage": "60.0",
+          "event_count": 600,
+          "grouped_by": {
+            "source": "api"
+          }
+        },
+        {
+          "cost": "40.00",
+          "usage": "400.00",
+          "percentage": "40.0",
+          "event_count": 400,
+          "grouped_by": {
+            "source": "webhook"
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {},
+  "invoice_pdf_url": "https://invoices.flexprice.io/inv_1234567890.pdf",
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-15T00:00:00Z",
+  "finalized_at": "2024-01-05T00:00:00Z",
+  "paid_at": "2024-01-15T00:00:00Z"
+}
+```
+</ResponseExample>

@@ -1,0 +1,538 @@
+---
+title: "Meter Configuration"
+description: "Configure meters to transform events into billable usage metrics"
+---
+
+Meters define how FlexPrice aggregates raw events into measurable usage. Each meter specifies which events to track, how to aggregate them, and what filters to apply.
+
+## Meter Structure
+
+A meter consists of these core components:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | Unique meter identifier (e.g., `mtr_api_calls`) |
+| `name` | string | Yes | Display name |
+| `event_name` | string | Yes | Event type to track (must match `event_name` in events) |
+| `aggregation` | object | Yes | How to aggregate events |
+| `filters` | array | No | Event property filters |
+| `reset_usage` | string | No | When to reset accumulated usage |
+
+### Example Meter Configuration
+
+<CodeGroup>
+```json API Call Counter
+{
+  "id": "mtr_api_calls",
+  "name": "API Calls",
+  "event_name": "api_request",
+  "aggregation": {
+    "type": "COUNT"
+  },
+  "filters": [],
+  "reset_usage": "BILLING_PERIOD"
+}
+```
+
+```json Storage with Filters
+{
+  "id": "mtr_storage_standard",
+  "name": "Standard Storage",
+  "event_name": "storage_used",
+  "aggregation": {
+    "type": "SUM",
+    "field": "bytes"
+  },
+  "filters": [
+    {
+      "key": "storage_class",
+      "values": ["standard"]
+    }
+  ],
+  "reset_usage": "BILLING_PERIOD"
+}
+```
+
+```json Compute with Multiplier
+{
+  "id": "mtr_compute_hours",
+  "name": "Compute Hours",
+  "event_name": "compute_usage",
+  "aggregation": {
+    "type": "SUM_WITH_MULTIPLIER",
+    "field": "duration_seconds",
+    "multiplier": "0.000277778"
+  },
+  "filters": [],
+  "reset_usage": "BILLING_PERIOD"
+}
+```
+</CodeGroup>
+
+## Aggregation Configuration
+
+The `aggregation` object defines how events are transformed into usage metrics.
+
+### Aggregation Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | Aggregation method (see [Aggregations](/metering/aggregations)) |
+| `field` | string | Conditional | Property name to aggregate (required for SUM, MAX, AVG, LATEST) |
+| `expression` | string | No | CEL expression for complex calculations |
+| `multiplier` | decimal | Conditional | Multiplier for SUM_WITH_MULTIPLIER type |
+| `bucket_size` | string | No | Time window for bucketed MAX or SUM aggregations |
+| `group_by` | string | No | Property to group by (MAX with bucket_size only) |
+
+### Common Aggregation Patterns
+
+<CodeGroup>
+```json Count Events
+{
+  "aggregation": {
+    "type": "COUNT"
+  }
+}
+```
+
+```json Sum Numeric Values
+{
+  "aggregation": {
+    "type": "SUM",
+    "field": "bytes"
+  }
+}
+```
+
+```json Max with Time Windows
+{
+  "aggregation": {
+    "type": "MAX",
+    "field": "concurrent_users",
+    "bucket_size": "HOUR"
+  }
+}
+```
+
+```json Complex Expression
+{
+  "aggregation": {
+    "type": "SUM",
+    "expression": "tokens * duration * multiplier"
+  }
+}
+```
+
+```json Unit Conversion
+{
+  "aggregation": {
+    "type": "SUM_WITH_MULTIPLIER",
+    "field": "duration_seconds",
+    "multiplier": "0.000277778"
+  }
+}
+```
+</CodeGroup>
+
+## Filters
+
+Filters allow you to create multiple meters from the same event type by matching specific property values.
+
+### Filter Structure
+
+```json
+{
+  "filters": [
+    {
+      "key": "property_name",
+      "values": ["value1", "value2"]
+    }
+  ]
+}
+```
+
+- **key**: Property name from `event.properties`
+- **values**: Array of acceptable values (OR logic)
+- Multiple filters use AND logic
+
+### Filter Examples
+
+<CodeGroup>
+```json Single Filter
+{
+  "filters": [
+    {
+      "key": "region",
+      "values": ["us-west-2"]
+    }
+  ]
+}
+```
+
+```json Multiple Values (OR)
+{
+  "filters": [
+    {
+      "key": "method",
+      "values": ["POST", "PUT", "DELETE"]
+    }
+  ]
+}
+```
+
+```json Multiple Filters (AND)
+{
+  "filters": [
+    {
+      "key": "region",
+      "values": ["us-west-2"]
+    },
+    {
+      "key": "storage_class",
+      "values": ["standard"]
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Reset Usage Behavior
+
+The `reset_usage` field controls when accumulated usage resets:
+
+| Value | Behavior | Use Case |
+|-------|----------|----------|
+| `BILLING_PERIOD` | Reset at start of each billing period | API calls, data transfer |
+| `NEVER` | Never reset (continuous accumulation) | Storage, peak usage |
+
+### Examples
+
+**Resetting Usage** (API Calls):
+```json
+{
+  "reset_usage": "BILLING_PERIOD"
+}
+```
+- Customer starts billing period with 0 usage
+- Usage accumulates throughout the period
+- Resets to 0 at start of next period
+
+**Non-Resetting Usage** (Storage):
+```json
+{
+  "reset_usage": "NEVER"
+}
+```
+- Usage represents current state (e.g., GB currently stored)
+- Latest value is used for billing
+- Historical values are preserved
+
+## Advanced Configurations
+
+### Bucketed Aggregations
+
+For MAX or SUM aggregations, use `bucket_size` to calculate over time windows:
+
+```json
+{
+  "aggregation": {
+    "type": "MAX",
+    "field": "concurrent_connections",
+    "bucket_size": "HOUR"
+  }
+}
+```
+
+**How it works:**
+1. Events are grouped into hourly buckets
+2. MAX is calculated within each bucket
+3. Buckets are summed for billing period total
+
+**Valid bucket sizes:** `HOUR`, `DAY`, `WEEK`, `MONTH`
+
+### Grouped Aggregations
+
+For bucketed MAX meters, use `group_by` to aggregate per property value:
+
+```json
+{
+  "aggregation": {
+    "type": "MAX",
+    "field": "active_users",
+    "bucket_size": "DAY",
+    "group_by": "organization_id"
+  }
+}
+```
+
+**How it works:**
+1. Events are grouped by bucket (day) and `organization_id`
+2. MAX is calculated per organization per day
+3. Results are summed across all organizations and days
+
+<Note>
+`group_by` is only supported for MAX aggregation with `bucket_size` configured.
+</Note>
+
+### CEL Expressions
+
+Use Common Expression Language (CEL) for complex calculations:
+
+```json
+{
+  "aggregation": {
+    "type": "SUM",
+    "expression": "tokens * duration * pixel_count / 1000000"
+  }
+}
+```
+
+**Expression context:**
+- Access event properties directly by name (e.g., `tokens`, `duration`)
+- Standard math operators: `+`, `-`, `*`, `/`, `%`
+- Comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- Logical: `&&`, `||`, `!`
+
+**Examples:**
+
+<CodeGroup>
+```cel Compute Units
+tokens * duration * pixel_count
+```
+
+```cel Conditional Logic
+duration > 60 ? duration * premium_rate : duration * standard_rate
+```
+
+```cel Multi-Factor Pricing
+cpu_cores * memory_gb * duration_seconds / 3600
+```
+</CodeGroup>
+
+## Creating Meters via API
+
+Meters are typically created through the FlexPrice dashboard, but can also be managed via API:
+
+```bash
+curl -X POST https://us.api.flexprice.io/v1/meters \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "API Calls",
+    "event_name": "api_request",
+    "aggregation": {
+      "type": "COUNT"
+    },
+    "reset_usage": "BILLING_PERIOD"
+  }'
+```
+
+See [Meters API Reference](/api-reference/meters) for full documentation.
+
+## Validation Rules
+
+FlexPrice validates meter configurations:
+
+<Steps>
+  <Step title="Required Fields">
+    `id`, `name`, `event_name`, and `aggregation.type` must be provided.
+  </Step>
+  
+  <Step title="Aggregation Type">
+    Must be a valid aggregation type (COUNT, SUM, MAX, etc.).
+  </Step>
+  
+  <Step title="Field Requirements">
+    SUM, MAX, AVG, LATEST require `field` or `expression`.
+  </Step>
+  
+  <Step title="Multiplier Validation">
+    SUM_WITH_MULTIPLIER requires `multiplier` > 0.
+  </Step>
+  
+  <Step title="Bucket Size">
+    Only valid for MAX or SUM aggregations.
+  </Step>
+  
+  <Step title="Group By">
+    Only valid for MAX with `bucket_size`.
+  </Step>
+  
+  <Step title="Filter Keys">
+    Filter keys must be non-empty with at least one value.
+  </Step>
+</Steps>
+
+## Use Case Examples
+
+### API Metering by Endpoint
+
+Track different API endpoints separately:
+
+<CodeGroup>
+```json Read Operations
+{
+  "id": "mtr_api_reads",
+  "name": "API Read Calls",
+  "event_name": "api_request",
+  "aggregation": {"type": "COUNT"},
+  "filters": [
+    {"key": "method", "values": ["GET"]}
+  ]
+}
+```
+
+```json Write Operations
+{
+  "id": "mtr_api_writes",
+  "name": "API Write Calls",
+  "event_name": "api_request",
+  "aggregation": {"type": "COUNT"},
+  "filters": [
+    {"key": "method", "values": ["POST", "PUT", "DELETE"]}
+  ]
+}
+```
+</CodeGroup>
+
+### Storage by Tier
+
+Measure storage across different tiers:
+
+<CodeGroup>
+```json Standard Storage
+{
+  "id": "mtr_storage_standard",
+  "name": "Standard Storage (GB)",
+  "event_name": "storage_snapshot",
+  "aggregation": {
+    "type": "MAX",
+    "field": "bytes",
+    "multiplier": "0.000000001"
+  },
+  "filters": [
+    {"key": "tier", "values": ["standard"]}
+  ],
+  "reset_usage": "NEVER"
+}
+```
+
+```json Archive Storage
+{
+  "id": "mtr_storage_archive",
+  "name": "Archive Storage (GB)",
+  "event_name": "storage_snapshot",
+  "aggregation": {
+    "type": "MAX",
+    "field": "bytes",
+    "multiplier": "0.000000001"
+  },
+  "filters": [
+    {"key": "tier", "values": ["archive"]}
+  ],
+  "reset_usage": "NEVER"
+}
+```
+</CodeGroup>
+
+### AI/ML Token Usage
+
+Track token consumption by model:
+
+<CodeGroup>
+```json GPT-4 Tokens
+{
+  "id": "mtr_tokens_gpt4",
+  "name": "GPT-4 Tokens",
+  "event_name": "ai_request",
+  "aggregation": {
+    "type": "SUM",
+    "field": "total_tokens"
+  },
+  "filters": [
+    {"key": "model", "values": ["gpt-4"]}
+  ]
+}
+```
+
+```json GPT-3.5 Tokens
+{
+  "id": "mtr_tokens_gpt35",
+  "name": "GPT-3.5 Tokens",
+  "event_name": "ai_request",
+  "aggregation": {
+    "type": "SUM",
+    "field": "total_tokens"
+  },
+  "filters": [
+    {"key": "model", "values": ["gpt-3.5-turbo"]}
+  ]
+}
+```
+</CodeGroup>
+
+### Peak Concurrent Usage
+
+Measure maximum concurrent connections:
+
+```json
+{
+  "id": "mtr_peak_connections",
+  "name": "Peak Concurrent Connections",
+  "event_name": "connection_count",
+  "aggregation": {
+    "type": "MAX",
+    "field": "count",
+    "bucket_size": "HOUR"
+  },
+  "reset_usage": "BILLING_PERIOD"
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="One Meter per Billable Metric">
+    Create separate meters for each distinct usage metric you want to bill.
+  </Step>
+  
+  <Step title="Use Descriptive Names">
+    Name meters clearly (e.g., "API Calls - Premium Tier" not "meter_1").
+  </Step>
+  
+  <Step title="Leverage Filters for Segmentation">
+    Use filters to create granular meters from the same event type.
+  </Step>
+  
+  <Step title="Choose Appropriate Aggregation">
+    Match aggregation type to your pricing model (COUNT for per-request, SUM for consumption, MAX for capacity).
+  </Step>
+  
+  <Step title="Test with Real Events">
+    Send test events and verify meters calculate usage correctly before production use.
+  </Step>
+  
+  <Step title="Document Custom Expressions">
+    If using CEL expressions, document the calculation logic for your team.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Aggregation Methods" icon="calculator" href="/metering/aggregations">
+    Learn about available aggregation types
+  </Card>
+  
+  <Card title="Send Events" icon="upload" href="/metering/events">
+    Start sending events to your meters
+  </Card>
+  
+  <Card title="Query Usage" icon="chart-line" href="/api-reference/events/get-usage-by-meter">
+    Retrieve aggregated usage data
+  </Card>
+  
+  <Card title="Connect to Pricing" icon="dollar-sign" href="/pricing/overview">
+    Link meters to prices for billing
+  </Card>
+</CardGroup>

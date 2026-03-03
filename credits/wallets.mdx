@@ -1,0 +1,323 @@
+---
+title: Wallets
+description: Manage customer credit wallets for prepaid and postpaid billing
+---
+
+## Overview
+
+Wallets store credits for customers and are the foundation of FlexPrice's credit management system. Each wallet is associated with a single customer and currency, and can operate in either prepaid or postpaid mode.
+
+## Wallet Types
+
+FlexPrice supports two wallet types that determine how credits are applied:
+
+### Prepaid Wallets
+
+**Type:** `PRE_PAID`
+
+Prepaid wallets store credits that reduce invoice amounts during invoice creation and finalization. These credits are automatically applied to eligible usage charges before the invoice is finalized.
+
+**Use cases:**
+- Credit adjustments
+- Credit note refunds
+- Purchased credits that adjust invoices
+- Promotional credits
+
+**Allowed price types:** `USAGE` only (configurable via `config.allowed_price_types`)
+
+### Postpaid Wallets
+
+**Type:** `POST_PAID`
+
+Postpaid wallets store credits used to pay invoices during payment processing. Customers can use these credits to settle outstanding invoices after they are finalized.
+
+**Use cases:**
+- Invoice payments via "credits" payment method
+- Customer-initiated credit payments
+
+**Allowed price types:** `ALL` (both usage and fixed charges)
+
+## Wallet Properties
+
+### Core Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique wallet identifier (prefix: `wallet_`) |
+| `customer_id` | string | Customer this wallet belongs to |
+| `currency` | string | Wallet currency (ISO 4217 code, e.g., `usd`) |
+| `wallet_type` | string | Either `PRE_PAID` or `POST_PAID` |
+| `wallet_status` | string | Current status: `active`, `frozen`, or `closed` |
+| `balance` | decimal | Current balance in currency units |
+| `credit_balance` | decimal | Current balance in credit units |
+
+### Conversion Rates
+
+Wallets use conversion rates to translate between credits and currency:
+
+| Field | Description | Example |
+|-------|-------------|----------|
+| `conversion_rate` | Credits to currency during consumption | `1.0` = 1 credit = 1 USD<br/>`2.0` = 1 credit = 2 USD<br/>`0.5` = 1 credit = 0.50 USD |
+| `topup_conversion_rate` | Credits to currency during top-up | Same calculation as above |
+
+**Formula:** `balance = credit_balance × conversion_rate`
+
+### Configuration
+
+```json
+{
+  "config": {
+    "allowed_price_types": ["USAGE"]  // or ["ALL"], ["FIXED"]
+  }
+}
+```
+
+Constrains which price types can be paid with wallet credits.
+
+## Creating a Wallet
+
+<Steps>
+
+<Step title="Prepare wallet request">
+
+Define the wallet properties including customer reference, currency, and initial credits:
+
+```json
+{
+  "customer_id": "cust_1234567890",
+  "currency": "usd",
+  "wallet_type": "PRE_PAID",
+  "conversion_rate": "1.0",
+  "initial_credits_to_load": "100.00",
+  "description": "Prepaid wallet for promotional credits"
+}
+```
+
+</Step>
+
+<Step title="Set optional configurations">
+
+Add auto top-up or alert settings:
+
+```json
+{
+  "customer_id": "cust_1234567890",
+  "currency": "usd",
+  "wallet_type": "PRE_PAID",
+  "conversion_rate": "1.0",
+  "initial_credits_to_load": "500.00",
+  "auto_topup": {
+    "enabled": true,
+    "threshold": "50.00",
+    "amount": "200.00",
+    "invoicing": true
+  },
+  "alert_settings": {
+    "alert_enabled": true,
+    "critical": {
+      "threshold": "10.00",
+      "condition": "below"
+    },
+    "warning": {
+      "threshold": "50.00",
+      "condition": "below"
+    }
+  }
+}
+```
+
+</Step>
+
+<Step title="Create the wallet">
+
+Send a POST request to create the wallet:
+
+```bash
+curl -X POST https://api.flexprice.io/v1/wallets \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+</Step>
+
+</Steps>
+
+<Note>
+When creating a wallet with `initial_credits_to_load`, you can optionally set an expiry date using `initial_credits_expiry_date_utc` in ISO 8601 format.
+</Note>
+
+## Wallet Operations
+
+### Top Up Credits
+
+Add credits to a wallet with a specific transaction reason:
+
+```json
+POST /v1/wallets/{wallet_id}/topup
+{
+  "credits_to_add": "100.00",
+  "transaction_reason": "FREE_CREDIT_GRANT",
+  "expiry_date_utc": "2025-12-31T23:59:59Z",
+  "priority": 1,
+  "description": "Q1 promotional credits"
+}
+```
+
+**Transaction reasons:**
+- `FREE_CREDIT_GRANT` - Promotional/free credits
+- `SUBSCRIPTION_CREDIT_GRANT` - Credits from subscription plans
+- `PURCHASED_CREDIT_INVOICED` - Credits purchased via invoice
+- `PURCHASED_CREDIT_DIRECT` - Credits purchased directly
+- `CREDIT_NOTE` - Credits from refund/credit memo
+
+### Debit Credits
+
+Manually debit credits from a wallet:
+
+```json
+POST /v1/wallets/{wallet_id}/debit
+{
+  "credits": "25.00",
+  "transaction_reason": "MANUAL_BALANCE_DEBIT",
+  "idempotency_key": "unique-operation-id",
+  "description": "Manual adjustment"
+}
+```
+
+### Get Wallet Balance
+
+Retrieve current balance with optional real-time calculation:
+
+```bash
+GET /v1/wallets/{wallet_id}/balance?include_real_time_balance=true
+```
+
+Response includes:
+- `balance` - Last calculated balance
+- `real_time_balance` - Current balance including pending transactions
+- `credit_balance` - Balance in credit units
+- `credits_available_breakdown` - Breakdown by purchased vs. free credits
+
+### Update Wallet Settings
+
+Update non-balance fields like auto top-up or alerts:
+
+```json
+PATCH /v1/wallets/{wallet_id}
+{
+  "auto_topup": {
+    "enabled": false
+  },
+  "alert_settings": {
+    "alert_enabled": true,
+    "critical": {
+      "threshold": "5.00",
+      "condition": "below"
+    }
+  }
+}
+```
+
+## Wallet Transactions
+
+Every wallet operation creates a transaction record with full audit trail:
+
+| Field | Description |
+|-------|-------------|
+| `id` | Transaction identifier |
+| `type` | `CREDIT` or `DEBIT` |
+| `transaction_status` | `PENDING`, `COMPLETED`, or `FAILED` |
+| `credit_amount` | Credits added/removed |
+| `amount` | Currency amount |
+| `credit_balance_before` | Balance before transaction |
+| `credit_balance_after` | Balance after transaction |
+| `credits_available` | Credits remaining that can be used |
+| `expiry_date` | When these credits expire (for credit transactions) |
+| `priority` | Usage priority (lower = used first) |
+| `transaction_reason` | Reason code for the transaction |
+
+### List Transactions
+
+```bash
+GET /v1/wallets/{wallet_id}/transactions
+  ?type=CREDIT
+  &transaction_status=COMPLETED
+  &limit=50
+```
+
+## Credit Application Order
+
+When a wallet has multiple credit transactions, FlexPrice applies them in this order:
+
+1. **Priority** - Lower priority number used first (if specified)
+2. **Expiry date** - Credits expiring soonest used first
+3. **Creation date** - Oldest credits used first (FIFO)
+
+<Note>
+Only transactions with `transaction_status=COMPLETED` and `credits_available > 0` are used for payments.
+</Note>
+
+## Wallet States
+
+### Status Values
+
+- **`active`** - Wallet can be used for credits and debits
+- **`frozen`** - Wallet cannot be modified (balance locked)
+- **`closed`** - Wallet is permanently closed
+
+### Alert States
+
+When alert settings are configured, wallets track an alert state:
+
+- **`ok`** - Balance is within acceptable range
+- **`info`** - Info threshold crossed
+- **`warning`** - Warning threshold crossed
+- **`critical`** - Critical threshold crossed
+
+<Warning>
+When a wallet reaches `critical` alert state, you should notify the customer immediately to prevent service disruption.
+</Warning>
+
+## Best Practices
+
+### Conversion Rates
+
+- Use `conversion_rate = 1.0` for most cases (1 credit = 1 currency unit)
+- Set `topup_conversion_rate` different from `conversion_rate` only if you want different exchange rates for purchases vs. consumption
+- Always validate that `balance = credit_balance × conversion_rate`
+
+### Credit Expiration
+
+- Set expiry dates on promotional credits to encourage usage
+- Use `priority` to control which credits are consumed first
+- Monitor expired credits with the `/v1/cron/expire-credits` endpoint
+
+### Wallet per Currency
+
+- Create separate wallets for each currency
+- Do not mix currencies within a single wallet
+- Use customer's default currency for the primary wallet
+
+### Idempotency
+
+- Always use `idempotency_key` for top-up and debit operations
+- Store the idempotency key with your transaction records
+- Use format: `{operation}-{your-id}-{timestamp}`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Credit Grants" icon="gift" href="/credits/grants">
+    Configure automatic credit allocation from plans
+  </Card>
+  <Card title="Auto Top-Up" icon="rotate" href="/credits/top-ups">
+    Set up automatic wallet recharging
+  </Card>
+  <Card title="Credit Expiration" icon="clock" href="/credits/expiration">
+    Manage credit expiration policies
+  </Card>
+  <Card title="Alerts" icon="bell" href="/monitoring/alerts">
+    Configure low balance notifications
+  </Card>
+</CardGroup>

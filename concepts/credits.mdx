@@ -1,0 +1,244 @@
+---
+title: Credits & wallets
+description: Managing prepaid and promotional credits in FlexPrice
+---
+
+FlexPrice's credit system enables prepaid billing, promotional credits, and wallet-based usage tracking.
+
+## Wallets
+
+A **wallet** stores a customer's credit balance:
+
+```json
+{
+  "customer_id": "cust_uuid",
+  "type": "PREPAID",
+  "currency": "USD",
+  "balance": 10000,
+  "conversion_rate": 100
+}
+```
+
+Wallet types:
+- **PREPAID** - Customer purchases credits upfront
+- **POSTPAID** - Usage tracked for later billing
+
+<Info>
+Conversion rate determines how credits map to currency (e.g., 100 credits = $1.00).
+</Info>
+
+## Credit Grants
+
+Credits are added to wallets via **credit grants**:
+
+```json
+{
+  "wallet_id": "wallet_uuid",
+  "amount": 5000,
+  "reason": "PREPAID",
+  "expiry_date": "2024-12-31T23:59:59Z",
+  "metadata": {
+    "campaign": "welcome_bonus"
+  }
+}
+```
+
+### Grant Types
+
+<Tabs>
+  <Tab title="Prepaid">
+    Customer purchases credits:
+    
+    ```json
+    {
+      "amount": 10000,
+      "reason": "PREPAID",
+      "grant_cadence": "ONE_TIME"
+    }
+    ```
+    
+    Credits are deducted as usage occurs.
+  </Tab>
+  
+  <Tab title="Promotional">
+    Free credits for marketing:
+    
+    ```json
+    {
+      "amount": 1000,
+      "reason": "PROMOTIONAL",
+      "expiry_date": "2024-12-31T23:59:59Z"
+    }
+    ```
+    
+    Expire after a period to drive urgency.
+  </Tab>
+  
+  <Tab title="Recurring">
+    Monthly credit allowance:
+    
+    ```json
+    {
+      "amount": 500,
+      "reason": "PROMOTIONAL",
+      "grant_cadence": "MONTHLY",
+      "recurrence_count": 12
+    }
+    ```
+    
+    Automatically renewed each period.
+  </Tab>
+</Tabs>
+
+## Credit Application
+
+Credits are applied to invoices automatically:
+
+<Steps>
+  <Step title="Invoice generated">
+    Usage and subscription charges create an invoice
+  </Step>
+  <Step title="Credits applied">
+    Wallet credits are applied based on priority and expiry
+  </Step>
+  <Step title="Balance deducted">
+    Credit balance is reduced by applied amount
+  </Step>
+  <Step title="Remaining due">
+    Any remaining amount is charged via payment method
+  </Step>
+</Steps>
+
+### Application Order
+
+1. **Priority** - Higher priority grants first
+2. **Expiry** - Expiring grants before non-expiring
+3. **FIFO** - Oldest grants first
+
+<Note>
+Promotional credits typically have lower priority than prepaid credits.
+</Note>
+
+## Auto Top-Up
+
+Automatically replenish credits when balance is low:
+
+```json
+{
+  "wallet_id": "wallet_uuid",
+  "auto_topup": {
+    "threshold": 1000,
+    "amount": 5000,
+    "invoice_customer": true
+  }
+}
+```
+
+When balance drops below threshold, automatically:
+- Grant specified credit amount
+- Optionally create invoice for payment
+
+<Tip>
+Auto top-up prevents service interruption for prepaid customers.
+</Tip>
+
+## Credit Expiration
+
+Credits can expire after a period:
+
+```json
+{
+  "expiry_date": "2024-12-31T23:59:59Z",
+  "expiry_policy": "DURATION"
+}
+```
+
+Expiry policies:
+- **NEVER** - Credits don't expire
+- **DURATION** - Expire at specific date
+- **BILLING_CYCLE** - Expire at end of billing period
+
+<Warning>
+Expired credits are automatically removed and cannot be recovered.
+</Warning>
+
+## Use Cases
+
+<Accordion title="Freemium Model">
+  Grant promotional credits to free tier users:
+  
+  ```json
+  {
+    "amount": 1000,
+    "reason": "PROMOTIONAL",
+    "expiry_policy": "NEVER"
+  }
+  ```
+  
+  When credits run out, prompt upgrade to paid plan.
+</Accordion>
+
+<Accordion title="Enterprise Prepaid">
+  Large customers purchase credit packages:
+  
+  ```json
+  {
+    "amount": 1000000,
+    "reason": "PREPAID",
+    "auto_topup": {
+      "threshold": 100000,
+      "amount": 500000
+    }
+  }
+  ```
+  
+  Auto top-up ensures uninterrupted service.
+</Accordion>
+
+<Accordion title="Seasonal Promotions">
+  Time-limited credit offers:
+  
+  ```json
+  {
+    "amount": 2000,
+    "reason": "PROMOTIONAL",
+    "expiry_date": "2024-01-31T23:59:59Z",
+    "metadata": {
+      "campaign": "new_year_2024"
+    }
+  }
+  ```
+  
+  Track campaign performance via metadata.
+</Accordion>
+
+## Monitoring
+
+Track wallet health:
+
+- Current balance
+- Total grants issued
+- Total credits consumed
+- Expiring credits in next 30 days
+- Auto top-up triggers
+
+<Info>
+Set up alerts when customer balances are running low to prevent service disruption.
+</Info>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Wallets Guide" href="/credits/wallets" icon="wallet">
+    Detailed wallet configuration
+  </Card>
+  <Card title="Grants Guide" href="/credits/grants" icon="gift">
+    Credit grant management
+  </Card>
+  <Card title="Create Wallet API" href="/api/wallets/create" icon="code">
+    API reference for wallets
+  </Card>
+  <Card title="Grant Credits API" href="/api/credits/grant" icon="code">
+    API reference for credit grants
+  </Card>
+</CardGroup>

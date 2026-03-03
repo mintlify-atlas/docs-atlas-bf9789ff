@@ -1,0 +1,226 @@
+---
+title: "Ingest Event"
+api: "POST /v1/events"
+description: "Send a single usage event to FlexPrice for metering and billing"
+---
+
+Use this endpoint when sending a single usage event from your application (e.g., one API call, one GB stored, or one transaction processed). Events are processed asynchronously and return immediately with a 202 status.
+
+## Use Cases
+
+- Track API requests or function calls
+- Record storage usage or data transfer
+- Log feature usage events
+- Monitor compute time or resource consumption
+- Capture transaction or message events
+
+## Request Body
+
+<ParamField body="event_name" type="string" required>
+  Unique identifier for the type of event. Used for filtering and aggregation in meters.
+  
+  Examples: `api_request`, `storage_gb`, `function_call`, `message_sent`
+</ParamField>
+
+<ParamField body="external_customer_id" type="string" required>
+  Your system's unique identifier for the customer. This is the ID you use in your application, not FlexPrice's internal ID.
+</ParamField>
+
+<ParamField body="event_id" type="string">
+  Optional idempotency key. If provided, duplicate events with the same `event_id` will be ignored. If omitted, FlexPrice generates a unique ID.
+  
+  Recommended for ensuring exactly-once processing.
+</ParamField>
+
+<ParamField body="customer_id" type="string">
+  FlexPrice's internal customer ID. Optional if you're using `external_customer_id`.
+</ParamField>
+
+<ParamField body="timestamp" type="string">
+  ISO 8601 timestamp for when the event occurred. Defaults to current server time if omitted.
+  
+  Format: `2024-03-20T15:04:05Z`
+</ParamField>
+
+<ParamField body="source" type="string">
+  Optional identifier for the event source (e.g., `api`, `mobile_app`, `webhook`, `batch_import`).
+  
+  Useful for filtering and debugging event origins.
+</ParamField>
+
+<ParamField body="properties" type="object">
+  Arbitrary key-value pairs containing additional event metadata. Values can be strings, numbers, or booleans.
+  
+  Examples:
+  - `{"request_size": 100, "response_status": 200}`
+  - `{"region": "us-east-1", "instance_type": "t3.medium"}`
+  - `{"user_tier": "premium", "api_version": "v2"}`
+  
+  Properties can be used in meters for:
+  - Filtering (only count events where `response_status = 200`)
+  - Aggregation (sum `request_size` values)
+  - Grouping in analytics
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation message: `"Event accepted for processing"`
+</ResponseField>
+
+<ResponseField name="event_id" type="string">
+  The event ID (either provided or generated). Use this for tracking and debugging.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://us.api.flexprice.io/v1/events \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_name": "api_request",
+    "external_customer_id": "customer_123",
+    "event_id": "req_xyz789",
+    "timestamp": "2024-03-20T15:04:05Z",
+    "source": "api",
+    "properties": {
+      "endpoint": "/v1/users",
+      "method": "GET",
+      "response_status": 200,
+      "response_time_ms": 45
+    }
+  }'
+```
+
+```javascript Node.js
+import { Flexprice } from '@flexprice/sdk';
+
+const client = new Flexprice({
+  apiKey: process.env.FLEXPRICE_API_KEY,
+  serverURL: 'https://us.api.flexprice.io/v1'
+});
+
+const result = await client.events.ingest({
+  eventName: 'api_request',
+  externalCustomerId: 'customer_123',
+  eventId: 'req_xyz789',
+  timestamp: new Date('2024-03-20T15:04:05Z'),
+  source: 'api',
+  properties: {
+    endpoint: '/v1/users',
+    method: 'GET',
+    response_status: 200,
+    response_time_ms: 45
+  }
+});
+
+console.log(result.eventId);
+```
+
+```python Python
+from flexprice import Flexprice
+from datetime import datetime
+
+client = Flexprice(
+    api_key=os.environ['FLEXPRICE_API_KEY'],
+    server_url='https://us.api.flexprice.io/v1'
+)
+
+result = client.events.ingest(
+    event_name='api_request',
+    external_customer_id='customer_123',
+    event_id='req_xyz789',
+    timestamp=datetime.fromisoformat('2024-03-20T15:04:05Z'),
+    source='api',
+    properties={
+        'endpoint': '/v1/users',
+        'method': 'GET',
+        'response_status': 200,
+        'response_time_ms': 45
+    }
+)
+
+print(result.event_id)
+```
+
+```go Go
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+    flexprice "github.com/flexprice/go-sdk"
+)
+
+func main() {
+    client := flexprice.New(
+        flexprice.WithAPIKey(os.Getenv("FLEXPRICE_API_KEY")),
+        flexprice.WithServerURL("https://us.api.flexprice.io/v1"),
+    )
+
+    timestamp, _ := time.Parse(time.RFC3339, "2024-03-20T15:04:05Z")
+    
+    result, err := client.Events.Ingest(context.Background(), &flexprice.IngestEventRequest{
+        EventName:          "api_request",
+        ExternalCustomerID: "customer_123",
+        EventID:            flexprice.String("req_xyz789"),
+        Timestamp:          &timestamp,
+        Source:             flexprice.String("api"),
+        Properties: map[string]interface{}{
+            "endpoint":          "/v1/users",
+            "method":            "GET",
+            "response_status":   200,
+            "response_time_ms":  45,
+        },
+    })
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    log.Println(result.EventID)
+}
+```
+</CodeGroup>
+
+## Response Codes
+
+<ResponseField name="202" type="Accepted">
+  Event accepted for processing. The event is queued and will be processed asynchronously.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  Invalid request payload. Check that:
+  - `event_name` and `external_customer_id` are provided
+  - `timestamp` is in ISO 8601 format if provided
+  - `properties` values are valid JSON types
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Missing or invalid API key.
+</ResponseField>
+
+<ResponseField name="500" type="Server Error">
+  Internal server error. The event was not accepted.
+</ResponseField>
+
+## Best Practices
+
+1. **Use idempotency keys**: Always provide `event_id` for critical events to prevent duplicate processing during retries.
+
+2. **Batch when possible**: If sending many events, use the [batch endpoint](/api/events/batch) for better performance.
+
+3. **Include rich properties**: Add relevant metadata to enable flexible filtering and aggregation in meters.
+
+4. **Use consistent naming**: Standardize your `event_name` values across your application (e.g., `snake_case` or `kebab-case`).
+
+5. **Set accurate timestamps**: Backfilling historical events requires accurate timestamps to ensure correct billing periods.
+
+## Related
+
+- [Batch Ingest Events](/api/events/batch) - Send multiple events in one request
+- [Query Events](/api/events/query) - Retrieve ingested events
+- [Meters](/api/meters) - Configure how events are metered

@@ -1,0 +1,314 @@
+---
+title: "Create Wallet"
+api: "POST /v1/wallets"
+description: "Create a prepaid or postpaid wallet for a customer to manage credits and usage-based billing."
+---
+
+## Request Body
+
+<ParamField body="customer_id" type="string">
+  The ID of the customer this wallet belongs to. Either `customer_id` or `external_customer_id` is required.
+</ParamField>
+
+<ParamField body="external_customer_id" type="string">
+  The external customer ID from your system. Either `customer_id` or `external_customer_id` is required.
+</ParamField>
+
+<ParamField body="currency" type="string" required>
+  Three-letter ISO currency code (e.g., USD, EUR, GBP)
+</ParamField>
+
+<ParamField body="wallet_type" type="string" default="PREPAID">
+  Type of wallet
+  
+  **Values:**
+  - `PREPAID`: Customer must load credits before usage
+  - `POSTPAID`: Customer can use credits and pay later
+</ParamField>
+
+<ParamField body="conversion_rate" type="string" default="1">
+  Conversion rate from wallet credits to currency during consumption
+  
+  Examples:
+  - `1`: 1 credit = 1 USD
+  - `2`: 1 credit = 0.5 USD (2 credits per dollar)
+  - `0.5`: 1 credit = 2 USD (0.5 credits per dollar)
+</ParamField>
+
+<ParamField body="topup_conversion_rate" type="string">
+  Conversion rate for top-ups to the currency. If not provided, uses `conversion_rate`.
+  
+  Examples:
+  - `1`: 1 USD = 1 credit
+  - `2`: 1 USD = 0.5 credits
+  - `0.5`: 1 USD = 2 credits
+</ParamField>
+
+<ParamField body="initial_credits_to_load" type="string" default="0">
+  Number of credits to load into the wallet upon creation (not currency amount)
+</ParamField>
+
+<ParamField body="initial_credits_expiry_date_utc" type="string">
+  Expiry date for initial credits in ISO 8601 format (e.g., 2025-12-31T23:59:59Z)
+  
+  If not set, credits don't expire.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description for the wallet
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom metadata as key-value pairs
+</ParamField>
+
+<ParamField body="alert_settings" type="object">
+  Alert configuration for low balance notifications
+  
+  <Expandable title="Alert settings object">
+    <ParamField body="alert_enabled" type="boolean" default="false">
+      Enable or disable alerts
+    </ParamField>
+    
+    <ParamField body="threshold_type" type="string">
+      Type of threshold
+      
+      **Values:** `PERCENTAGE`, `ABSOLUTE`
+    </ParamField>
+    
+    <ParamField body="threshold_value" type="string">
+      Threshold value (percentage or absolute amount)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="auto_topup" type="object">
+  Auto top-up configuration
+  
+  <Expandable title="Auto top-up object">
+    <ParamField body="enabled" type="boolean" default="false">
+      Enable automatic top-ups when balance is low
+    </ParamField>
+    
+    <ParamField body="threshold" type="string">
+      Balance threshold that triggers auto top-up
+    </ParamField>
+    
+    <ParamField body="amount" type="string">
+      Amount to add during auto top-up
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="price_unit" type="string">
+  Price unit code to use for wallet creation. If provided, overrides `currency` and `conversion_rate` with values from the price unit.
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the wallet
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  ID of the customer this wallet belongs to
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Auto-generated wallet name (e.g., "Prepaid Wallet - USD")
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Three-letter ISO currency code
+</ResponseField>
+
+<ResponseField name="wallet_type" type="string">
+  Type of wallet (PREPAID or POSTPAID)
+</ResponseField>
+
+<ResponseField name="wallet_status" type="string">
+  Current status of the wallet
+  
+  **Values:** `ACTIVE`, `INACTIVE`, `SUSPENDED`
+</ResponseField>
+
+<ResponseField name="balance" type="string">
+  Current balance in currency
+</ResponseField>
+
+<ResponseField name="credit_balance" type="string">
+  Current balance in credits
+</ResponseField>
+
+<ResponseField name="conversion_rate" type="string">
+  Conversion rate from credits to currency
+</ResponseField>
+
+<ResponseField name="topup_conversion_rate" type="string">
+  Conversion rate for top-ups
+</ResponseField>
+
+<ResponseField name="alert_settings" type="object">
+  Alert configuration
+</ResponseField>
+
+<ResponseField name="alert_state" type="string">
+  Current alert state
+  
+  **Values:** `OK`, `WARNING`, `CRITICAL`
+</ResponseField>
+
+<ResponseField name="auto_topup" type="object">
+  Auto top-up configuration
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Timestamp when wallet was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  Timestamp when wallet was last updated
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.flexprice.io/v1/wallets" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cust_1234",
+    "currency": "usd",
+    "wallet_type": "PREPAID",
+    "conversion_rate": "1",
+    "initial_credits_to_load": "100.00"
+  }'
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+wallet = client.wallets.create(
+    customer_id="cust_1234",
+    currency="usd",
+    wallet_type="PREPAID",
+    conversion_rate="1",
+    initial_credits_to_load="100.00"
+)
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+const wallet = await client.wallets.create({
+  customerId: "cust_1234",
+  currency: "usd",
+  walletType: "PREPAID",
+  conversionRate: "1",
+  initialCreditsToLoad: "100.00"
+});
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+wallet, err := client.Wallets.Create(context.Background(), &flexprice.WalletCreateParams{
+    CustomerID: "cust_1234",
+    Currency: "usd",
+    WalletType: "PREPAID",
+    ConversionRate: "1",
+    InitialCreditsToLoad: "100.00",
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "id": "wallet_abc123",
+  "customer_id": "cust_1234",
+  "name": "Prepaid Wallet - USD",
+  "currency": "usd",
+  "wallet_type": "PREPAID",
+  "wallet_status": "ACTIVE",
+  "balance": "100.000000000",
+  "credit_balance": "100.000000000",
+  "conversion_rate": "1.00000",
+  "topup_conversion_rate": "1.00000",
+  "alert_state": "OK",
+  "metadata": {},
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+</ResponseExample>
+
+## Wallet Types Explained
+
+<AccordionGroup>
+  <Accordion title="Prepaid Wallet">
+    A prepaid wallet requires customers to load credits before using your service.
+    
+    **Use cases:**
+    - Pay-as-you-go models
+    - Promotional credits
+    - Preventing overages
+    - Prepaid customer segments
+    
+    **Behavior:**
+    - Usage is blocked when balance reaches zero
+    - Credits must be added before additional usage
+    - Suitable for usage-based pricing only
+  </Accordion>
+  
+  <Accordion title="Postpaid Wallet">
+    A postpaid wallet allows customers to use services and pay later through invoicing.
+    
+    **Use cases:**
+    - Enterprise customers
+    - Net payment terms
+    - Monthly invoicing cycles
+    - Customers with credit arrangements
+    
+    **Behavior:**
+    - Balance can go negative
+    - Usage tracked and invoiced periodically
+    - Supports all price types (fixed, usage, tiered, etc.)
+  </Accordion>
+</AccordionGroup>
+
+## Conversion Rate Examples
+
+<Tip>
+  Conversion rates allow you to decouple internal credit accounting from actual currency values.
+</Tip>
+
+**Example 1: 1:1 conversion**
+```json
+{
+  "conversion_rate": "1",
+  "currency": "usd"
+}
+```
+Result: 1 credit = $1.00 USD
+
+**Example 2: Bulk discount pricing**
+```json
+{
+  "conversion_rate": "0.8",
+  "currency": "usd"
+}
+```
+Result: 1 credit = $0.80 USD (customer gets 25% more value)
+
+**Example 3: Premium pricing**
+```json
+{
+  "conversion_rate": "1.5",
+  "currency": "usd"
+}
+```
+Result: 1 credit = $1.50 USD

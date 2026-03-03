@@ -1,0 +1,580 @@
+---
+title: Architecture Overview
+description: Understanding FlexPrice's system architecture and technology stack
+---
+
+## System Architecture
+
+FlexPrice uses a modern, scalable microservices architecture designed to handle high-volume usage metering and real-time billing calculations.
+
+<img
+  src="https://raw.githubusercontent.com/flexprice/flexprice/main/assets/features.jpg"
+  alt="FlexPrice Architecture"
+/>
+
+## Technology Stack
+
+FlexPrice is built on proven, production-ready technologies:
+
+<CardGroup cols={2}>
+  <Card title="Go 1.23+" icon="golang">
+    High-performance backend written in Go for speed and reliability
+  </Card>
+  <Card title="Gin Framework" icon="server">
+    Fast HTTP web framework with middleware support
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    Transactional database for core business data
+  </Card>
+  <Card title="ClickHouse" icon="chart-line">
+    Analytics database for high-volume event storage
+  </Card>
+  <Card title="Apache Kafka" icon="stream">
+    Message queue for reliable event processing
+  </Card>
+  <Card title="Temporal" icon="clock">
+    Workflow engine for long-running billing processes
+  </Card>
+  <Card title="Ent ORM" icon="diagram-project">
+    Entity framework for type-safe database operations
+  </Card>
+  <Card title="Uber FX" icon="plug">
+    Dependency injection framework for clean architecture
+  </Card>
+</CardGroup>
+
+## Core Services
+
+FlexPrice runs three main service types that can be deployed independently for scalability:
+
+<Tabs>
+  <Tab title="API Service">
+    **Deployment Mode:** `api`
+
+    The API service handles all HTTP requests:
+    - Usage event ingestion
+    - Customer and plan management
+    - Invoice generation requests
+    - Feature entitlement checks
+    - Real-time usage queries
+
+    **Configuration:**
+    ```bash
+    export FLEXPRICE_DEPLOYMENT_MODE=api
+    ```
+
+    **Docker Compose:**
+    ```yaml
+    flexprice-api:
+      image: flexprice-app:local
+      ports:
+        - "127.0.0.1:8080:8080"
+      environment:
+        - FLEXPRICE_DEPLOYMENT_MODE=api
+        - FLEXPRICE_POSTGRES_HOST=postgres
+        - FLEXPRICE_KAFKA_BROKERS=kafka:9092
+        - FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+        - FLEXPRICE_TEMPORAL_ADDRESS=temporal:7233
+    ```
+  </Tab>
+
+  <Tab title="Consumer Service">
+    **Deployment Mode:** `consumer`
+
+    The consumer service processes events from Kafka:
+    - Reads from multiple Kafka topics
+    - Writes events to ClickHouse
+    - Triggers metering calculations
+    - Processes feature usage tracking
+    - Handles post-processing pipelines
+
+    **Configuration:**
+    ```bash
+    export FLEXPRICE_DEPLOYMENT_MODE=consumer
+    ```
+
+    **Docker Compose:**
+    ```yaml
+    flexprice-consumer:
+      image: flexprice-app:local
+      environment:
+        - FLEXPRICE_DEPLOYMENT_MODE=consumer
+        - FLEXPRICE_POSTGRES_HOST=postgres
+        - FLEXPRICE_KAFKA_BROKERS=kafka:9092
+        - FLEXPRICE_CLICKHOUSE_ADDRESS=clickhouse:9000
+    ```
+  </Tab>
+
+  <Tab title="Worker Service">
+    **Deployment Mode:** `temporal_worker`
+
+    The worker service executes Temporal workflows:
+    - Billing cycle processing
+    - Invoice generation workflows
+    - Subscription lifecycle management
+    - Credit expiration handling
+    - Integration sync jobs
+
+    **Configuration:**
+    ```bash
+    export FLEXPRICE_DEPLOYMENT_MODE=temporal_worker
+    ```
+
+    **Docker Compose:**
+    ```yaml
+    flexprice-worker:
+      image: flexprice-app:local
+      environment:
+        - FLEXPRICE_DEPLOYMENT_MODE=temporal_worker
+        - FLEXPRICE_POSTGRES_HOST=postgres
+        - FLEXPRICE_TEMPORAL_ADDRESS=temporal:7233
+    ```
+  </Tab>
+
+  <Tab title="Local Mode">
+    **Deployment Mode:** `local` (default)
+
+    For development, all services run in a single process:
+    - API server
+    - Kafka consumer
+    - Temporal worker
+
+    **Configuration:**
+    ```bash
+    # Default mode - no env var needed
+    go run cmd/server/main.go
+    ```
+
+    <Warning>
+      Local mode is for development only. Use separate deployment modes in production for scalability.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Infrastructure Components
+
+### PostgreSQL
+
+Stores transactional data with strong consistency guarantees:
+
+- Customers, plans, subscriptions
+- Pricing rules and configurations
+- Invoices and payment records
+- Credit grants and wallet balances
+- Feature definitions and entitlements
+
+**Connection Details (Local):**
+```yaml
+Host: localhost
+Port: 5432
+Database: flexprice
+Username: flexprice
+Password: flexprice123
+```
+
+### ClickHouse
+
+Handles high-volume analytics and event storage:
+
+- Raw usage events (millions per second)
+- Aggregated usage metrics
+- Time-series analysis
+- Cost calculations
+- Audit logs
+
+**Connection Details (Local):**
+```yaml
+Host: localhost
+HTTP Port: 8123
+Native Port: 9000
+Database: flexprice
+Username: flexprice
+Password: flexprice123
+```
+
+### Apache Kafka
+
+Provides reliable, ordered event streaming:
+
+**Topics:**
+- `events` - Raw event ingestion from API
+- `events_lazy` - Deferred event processing
+- `events_post_processing` - Post-processing pipeline
+- `system_events` - Internal system events and webhooks
+
+**Connection Details (Local):**
+```yaml
+Bootstrap Server: localhost:29092
+Internal Address: kafka:9092
+```
+
+<Info>
+  Kafka UI is available at http://localhost:8084 with the `--profile dev` flag.
+</Info>
+
+### Temporal
+
+Orchestrates long-running business processes:
+
+- **Workflows**: Multi-step billing processes
+- **Activities**: Individual tasks (invoice generation, payment processing)
+- **Retry Logic**: Automatic retry with exponential backoff
+- **Observability**: Full execution history and debugging
+
+**Connection Details (Local):**
+```yaml
+Temporal Server: localhost:7233
+Temporal UI: http://localhost:8088
+```
+
+## Layered Architecture
+
+FlexPrice follows clean architecture principles with clear separation of concerns:
+
+<Steps>
+  <Step title="Domain Layer">
+    **Location:** `internal/domain/`
+
+    Core business entities and domain models:
+    - Pure business logic
+    - Repository interfaces (no implementations)
+    - No external dependencies
+    - Framework-agnostic
+
+    ```go
+    // Example: Domain interface
+    type EventRepository interface {
+        Create(context.Context, *Event) error
+        FindByID(context.Context, string) (*Event, error)
+    }
+    ```
+  </Step>
+
+  <Step title="Repository Layer">
+    **Location:** `internal/repository/`
+
+    Data access implementations:
+    - Implements domain repository interfaces
+    - Direct database access (Ent, ClickHouse)
+    - Data mapping and persistence
+    - Query optimization
+
+    ```go
+    // Example: Repository implementation
+    type clickhouseEventRepository struct {
+        client *clickhouse.Client
+    }
+
+    func (r *clickhouseEventRepository) Create(ctx context.Context, event *Event) error {
+        // ClickHouse insertion logic
+    }
+    ```
+  </Step>
+
+  <Step title="Service Layer">
+    **Location:** `internal/service/`
+
+    Business logic orchestration:
+    - Uses repository interfaces
+    - Transaction management
+    - Complex business rules
+    - Temporal workflow integration
+
+    ```go
+    // Example: Service composition
+    type BillingService struct {
+        eventRepo    domain.EventRepository
+        invoiceRepo  domain.InvoiceRepository
+        temporal     TemporalService
+    }
+    ```
+  </Step>
+
+  <Step title="API Layer">
+    **Location:** `internal/api/`
+
+    HTTP request/response handling:
+    - Request validation
+    - DTO conversions
+    - Response formatting
+    - No business logic
+
+    ```go
+    // Example: API handler
+    func (h *EventHandler) Create(c *gin.Context) {
+        var req CreateEventRequest
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(400, gin.H{"error": err.Error()})
+            return
+        }
+        // Delegate to service layer
+        event, err := h.service.CreateEvent(c.Request.Context(), req)
+    }
+    ```
+  </Step>
+</Steps>
+
+## Event Processing Flow
+
+Understand how usage events flow through the system:
+
+<Steps>
+  <Step title="Event Ingestion">
+    Events arrive via API or SDK:
+    ```json
+    POST /v1/events
+    {
+      "customer_id": "customer_123",
+      "event_name": "api_call",
+      "timestamp": "2026-03-03T10:30:00Z",
+      "properties": {
+        "endpoint": "/api/users",
+        "method": "GET"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Kafka Publishing">
+    API service publishes event to Kafka `events` topic for reliable processing
+  </Step>
+
+  <Step title="Consumer Processing">
+    Consumer service:
+    - Reads events from Kafka
+    - Validates event structure
+    - Enriches with customer/plan data
+    - Writes to ClickHouse
+  </Step>
+
+  <Step title="Metering & Analytics">
+    - Real-time aggregation of usage metrics
+    - Feature usage tracking and limits
+    - Cost calculation based on pricing rules
+    - Alert triggers for thresholds
+  </Step>
+
+  <Step title="Billing Workflows">
+    Temporal workflows triggered for:
+    - Invoice generation at billing cycle end
+    - Credit deductions
+    - Overage calculations
+    - Payment processing
+  </Step>
+</Steps>
+
+## Project Structure
+
+```
+flexprice/
+├── cmd/
+│   ├── server/          # Main application entry point
+│   └── migrate/         # Database migration tool
+├── ent/
+│   └── schema/          # Ent entity schemas (data models)
+├── internal/
+│   ├── api/             # HTTP handlers and routing
+│   │   ├── v1/          # API v1 handlers
+│   │   └── cron/        # Scheduled job handlers
+│   ├── domain/          # Domain models and interfaces
+│   ├── repository/      # Data access layer implementations
+│   ├── service/         # Business logic layer
+│   ├── temporal/        # Temporal workflows and activities
+│   │   ├── workflows/   # Workflow definitions
+│   │   └── activities/  # Activity implementations
+│   ├── integration/     # Third-party integrations
+│   ├── config/          # Configuration management
+│   ├── postgres/        # PostgreSQL client
+│   ├── clickhouse/      # ClickHouse client
+│   └── kafka/           # Kafka producer/consumer
+├── migrations/
+│   ├── postgres/        # PostgreSQL migrations
+│   └── clickhouse/      # ClickHouse migrations
+└── api/                 # Generated SDKs
+    ├── go/              # Go SDK
+    ├── python/          # Python SDK
+    ├── typescript/      # TypeScript SDK
+    └── mcp/             # MCP server
+```
+
+## Dependency Injection
+
+FlexPrice uses Uber FX for dependency injection:
+
+```go
+func main() {
+    app := fx.New(
+        // Infrastructure
+        fx.Provide(postgres.NewClient),
+        fx.Provide(clickhouse.NewClient),
+        fx.Provide(kafka.NewProducer),
+        fx.Provide(temporal.NewClient),
+        
+        // Repositories
+        fx.Provide(repository.NewEventRepository),
+        fx.Provide(repository.NewInvoiceRepository),
+        
+        // Services
+        fx.Provide(service.NewBillingService),
+        fx.Provide(service.NewMeteringService),
+        
+        // API
+        fx.Provide(api.NewRouter),
+        
+        // Lifecycle
+        fx.Invoke(startServer),
+    )
+    
+    app.Run()
+}
+```
+
+## Multi-Tenancy Model
+
+All data is isolated by tenant and environment:
+
+<Tabs>
+  <Tab title="Tenant">
+    Top-level isolation boundary representing a company or organization.
+    
+    Each tenant has:
+    - Separate API keys
+    - Independent data storage
+    - Isolated billing cycles
+    - Dedicated configurations
+  </Tab>
+
+  <Tab title="Environment">
+    Within each tenant (e.g., production, staging, development):
+    
+    - Test pricing without affecting production
+    - Validate integrations safely
+    - Separate event streams
+    - Independent database schemas
+  </Tab>
+</Tabs>
+
+<Warning>
+  All database queries and API operations are automatically scoped to tenant + environment for data isolation.
+</Warning>
+
+## Scalability & Performance
+
+<CardGroup cols={2}>
+  <Card title="Horizontal Scaling" icon="arrows-left-right">
+    Scale each service independently:
+    - Multiple API instances behind load balancer
+    - Consumer instances with Kafka consumer groups
+    - Worker instances for parallel workflow execution
+  </Card>
+  <Card title="High Throughput" icon="gauge-high">
+    Handle millions of events per second:
+    - Kafka buffering and batching
+    - ClickHouse columnar storage
+    - Async event processing
+  </Card>
+  <Card title="Real-Time Processing" icon="bolt">
+    Low-latency event to insight:
+    - Sub-second event ingestion
+    - Real-time usage aggregation
+    - Immediate feature limit checks
+  </Card>
+  <Card title="Reliability" icon="shield">
+    Built-in resilience:
+    - Temporal automatic retries
+    - Kafka message persistence
+    - Database transaction safety
+  </Card>
+</CardGroup>
+
+## Integrations
+
+FlexPrice integrates with your existing tools:
+
+**Payment Providers:**
+- Stripe
+- Chargebee
+- Razorpay
+
+**CRM Systems:**
+- HubSpot
+- Salesforce (via API)
+
+**Accounting:**
+- QuickBooks
+- NetSuite (via API)
+
+<Info>
+  Integration implementations are in `internal/integration/` using a factory pattern for provider instantiation.
+</Info>
+
+## Configuration Management
+
+Configuration is managed via Viper with multiple sources:
+
+<Steps>
+  <Step title="Config File">
+    Default configuration in `internal/config/config.yaml`
+  </Step>
+  <Step title="Environment Variables">
+    Override with environment variables (prefix: `FLEXPRICE_`)
+    
+    Examples:
+    - `FLEXPRICE_POSTGRES_HOST` overrides `postgres.host`
+    - `FLEXPRICE_KAFKA_BROKERS` overrides `kafka.brokers`
+  </Step>
+  <Step title=".env File">
+    Loaded automatically by godotenv for local development
+  </Step>
+</Steps>
+
+## Monitoring & Observability
+
+<CardGroup cols={2}>
+  <Card title="Structured Logging" icon="file-lines">
+    JSON logs via `internal/logger` for easy parsing and analysis
+  </Card>
+  <Card title="Temporal UI" icon="clock">
+    Complete workflow execution history, debugging, and manual triggers at http://localhost:8088
+  </Card>
+  <Card title="Kafka UI" icon="stream">
+    Monitor topics, messages, and consumer lag at http://localhost:8084
+  </Card>
+  <Card title="Health Checks" icon="heart-pulse">
+    Service health endpoints for load balancer integration
+  </Card>
+</CardGroup>
+
+## Security
+
+<CardGroup cols={2}>
+  <Card title="API Key Authentication" icon="key">
+    All API requests require valid API key in `X-API-Key` header
+  </Card>
+  <Card title="Tenant Isolation" icon="lock">
+    Automatic data scoping prevents cross-tenant data access
+  </Card>
+  <Card title="Database Security" icon="database">
+    Encrypted connections, credential management, prepared statements
+  </Card>
+  <Card title="Audit Logging" icon="file-shield">
+    All operations logged with user context for compliance
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Explore all available endpoints and data models
+  </Card>
+  <Card title="Product Catalog" icon="tag" href="/docs/Product%20catalogue/Plans/Overview">
+    Set up plans, pricing, and features
+  </Card>
+  <Card title="Event Ingestion" icon="arrow-up" href="/api-reference/events/get-raw-events">
+    Learn about event schemas and best practices
+  </Card>
+  <Card title="Contributing" icon="code-branch" href="https://github.com/flexprice/flexprice/blob/main/CONTRIBUTING.md">
+    Contribute to FlexPrice development
+  </Card>
+</CardGroup>

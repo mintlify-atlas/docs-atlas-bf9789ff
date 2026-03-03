@@ -1,0 +1,229 @@
+---
+title: Pricing models
+description: Understanding FlexPrice's flexible pricing and plan system
+---
+
+FlexPrice supports multiple pricing models to match your business needs: usage-based, seat-based, hybrid, and tiered pricing.
+
+## Plans
+
+A **plan** defines the pricing structure for a customer subscription. Plans can include:
+
+- Fixed subscription fees
+- Usage-based pricing
+- Seat-based pricing
+- Feature entitlements
+- Add-ons
+
+```json
+{
+  "name": "Professional Plan",
+  "description": "For growing teams",
+  "plan_type": "SUBSCRIPTION",
+  "billing_cadence": "MONTHLY",
+  "prices": [
+    {
+      "name": "Base Fee",
+      "price_type": "FIXED",
+      "amount": 9900,
+      "currency": "USD"
+    }
+  ]
+}
+```
+
+<Info>
+Plans are versioned, allowing you to evolve pricing while maintaining existing customer subscriptions.
+</Info>
+
+## Pricing Models
+
+<Tabs>
+  <Tab title="Usage-Based">
+    Charge customers based on actual usage of your product:
+
+    ```json
+    {
+      "name": "API Calls",
+      "price_type": "USAGE",
+      "meter_id": "meter_api_calls",
+      "billing_model": "FLAT_FEE",
+      "unit_amount": 10,
+      "currency": "USD"
+    }
+    ```
+
+    **$0.01 per API call** - Simple and transparent
+  </Tab>
+
+  <Tab title="Seat-Based">
+    Charge per user or seat:
+
+    ```json
+    {
+      "name": "Per Seat",
+      "price_type": "FIXED",
+      "amount": 2000,
+      "currency": "USD",
+      "billing_model": "FLAT_FEE",
+      "transform_quantity": {
+        "divide_by": 1
+      }
+    }
+    ```
+
+    **$20 per seat per month**
+  </Tab>
+
+  <Tab title="Hybrid">
+    Combine fixed and usage pricing:
+
+    ```json
+    {
+      "prices": [
+        {
+          "name": "Base Fee",
+          "price_type": "FIXED",
+          "amount": 4900
+        },
+        {
+          "name": "Usage",
+          "price_type": "USAGE",
+          "meter_id": "meter_storage",
+          "unit_amount": 50
+        }
+      ]
+    }
+    ```
+
+    **$49/month + $0.50 per GB**
+  </Tab>
+
+  <Tab title="Tiered">
+    Volume-based pricing with tiers:
+
+    ```json
+    {
+      "billing_model": "TIERED",
+      "tiered_mode": "VOLUME",
+      "tiers": [
+        { "up_to": 1000, "unit_amount": 100 },
+        { "up_to": 10000, "unit_amount": 80 },
+        { "up_to": null, "unit_amount": 50 }
+      ]
+    }
+    ```
+
+    **$1.00 for 0-1K, $0.80 for 1K-10K, $0.50 for 10K+**
+  </Tab>
+</Tabs>
+
+## Features
+
+Plans can include feature entitlements:
+
+- **Boolean features** - Enable/disable capabilities
+- **Metered features** - Usage limits (e.g., "1000 API calls/month")
+- **Static features** - Configuration values
+
+```json
+{
+  "features": [
+    {
+      "name": "Advanced Analytics",
+      "feature_type": "BOOLEAN",
+      "value": true
+    },
+    {
+      "name": "API Calls",
+      "feature_type": "METERED",
+      "meter_id": "meter_api",
+      "limit": 10000
+    }
+  ]
+}
+```
+
+<Tip>
+Use features to gate functionality in your application and enforce usage limits.
+</Tip>
+
+## Billing Models
+
+### Flat Fee
+Simple per-unit pricing:
+- $0.01 per API call
+- $20 per seat
+- $0.50 per GB
+
+### Package
+Bundled units with overage:
+- First 1000 API calls included
+- $5 per additional 100 calls
+
+### Tiered
+Volume discounts:
+- **Volume mode** - All units at the tier rate
+- **Slab mode** - Each tier priced independently
+
+## Price Components
+
+Each price can have:
+
+- `unit_amount` - Base price per unit
+- `transform_quantity` - Modify quantity before billing
+- `tiers` - Volume-based pricing
+- `metadata` - Custom data for reporting
+
+<Note>
+Prices are always specified in the smallest currency unit (cents for USD).
+</Note>
+
+## Plan Versioning
+
+When you update a plan:
+
+1. New version is created automatically
+2. Existing subscriptions remain on old version
+3. New subscriptions use latest version
+4. Customers can be migrated to new versions
+
+<Warning>
+Plan changes don't automatically affect existing subscriptions. Migrate customers explicitly.
+</Warning>
+
+## Add-Ons
+
+Extend plans with optional add-ons:
+
+```json
+{
+  "name": "Extra Storage",
+  "addon_type": "MULTIPLE_INSTANCE",
+  "prices": [
+    {
+      "name": "100 GB Pack",
+      "amount": 1000
+    }
+  ]
+}
+```
+
+Customers can purchase add-ons independently of their base plan.
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Plans Guide" href="/pricing/plans" icon="rectangle-list">
+    Detailed plan configuration
+  </Card>
+  <Card title="Prices Guide" href="/pricing/prices" icon="dollar-sign">
+    Price structure and billing models
+  </Card>
+  <Card title="Features Guide" href="/pricing/features" icon="star">
+    Feature management and gating
+  </Card>
+  <Card title="Create Plan API" href="/api/plans/create" icon="code">
+    API reference for plans
+  </Card>
+</CardGroup>

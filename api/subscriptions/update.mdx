@@ -1,0 +1,141 @@
+---
+title: "Update Subscription"
+api: "PUT /v1/subscriptions/{id}"
+description: "Update subscription details. Use when changing subscription status, cancellation date, or parent relationship. Supports partial updates."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique identifier of the subscription to update.
+  
+  **Example:** `"sub_x1y2z3a4b5c6d7e8f9g0"`
+</ParamField>
+
+## Request Body
+
+<ParamField body="status" type="string">
+  Updated subscription status.
+  
+  **Options:** `"ACTIVE"`, `"CANCELLED"`, `"INCOMPLETE"`, `"EXPIRED"`, `"PAUSED"`, `"DRAFT"`
+</ParamField>
+
+<ParamField body="cancel_at" type="string">
+  ISO 8601 timestamp for when the subscription should be cancelled.
+  
+  **Example:** `"2024-12-31T23:59:59Z"`
+</ParamField>
+
+<ParamField body="cancel_at_period_end" type="boolean">
+  Whether the subscription should cancel at the end of the current period.
+  
+  **Example:** `true`
+</ParamField>
+
+<ParamField body="parent_subscription_id" type="string">
+  Parent subscription ID for hierarchy. Set to empty string `""` to remove parent relationship. Omit to leave unchanged.
+  
+  **Example:** `"sub_parent123"`
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the subscription.
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  FlexPrice customer ID.
+</ResponseField>
+
+<ResponseField name="plan_id" type="string">
+  Plan ID.
+</ResponseField>
+
+<ResponseField name="subscription_status" type="string">
+  Updated subscription status.
+</ResponseField>
+
+<ResponseField name="cancel_at" type="string">
+  Updated cancellation date (if set).
+</ResponseField>
+
+<ResponseField name="cancel_at_period_end" type="boolean">
+  Updated cancel at period end flag.
+</ResponseField>
+
+<ResponseField name="parent_subscription_id" type="string">
+  Updated parent subscription ID (if set).
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Currency code.
+</ResponseField>
+
+<ResponseField name="billing_cadence" type="string">
+  Billing frequency.
+</ResponseField>
+
+<ResponseField name="billing_period" type="string">
+  Billing period unit.
+</ResponseField>
+
+<ResponseField name="start_date" type="string">
+  ISO 8601 timestamp when subscription starts.
+</ResponseField>
+
+<ResponseField name="current_period_start" type="string">
+  ISO 8601 timestamp of current billing period start.
+</ResponseField>
+
+<ResponseField name="current_period_end" type="string">
+  ISO 8601 timestamp of current billing period end.
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the subscription was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp when the subscription was last updated.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request PUT \
+  --url https://api.flexprice.io/v1/subscriptions/sub_x1y2z3a4b5c6d7e8f9g0 \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "cancel_at_period_end": true
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "sub_x1y2z3a4b5c6d7e8f9g0",
+  "customer_id": "cust_a1b2c3d4e5f6g7h8i9j0",
+  "plan_id": "plan_a1b2c3d4e5f6g7h8i9j0",
+  "subscription_status": "ACTIVE",
+  "currency": "usd",
+  "billing_cadence": "IN_ADVANCE",
+  "billing_period": "MONTH",
+  "billing_period_count": 1,
+  "start_date": "2024-03-20T00:00:00Z",
+  "current_period_start": "2024-03-20T00:00:00Z",
+  "current_period_end": "2024-04-20T00:00:00Z",
+  "cancel_at_period_end": true,
+  "metadata": {
+    "source": "website"
+  },
+  "created_at": "2024-03-20T15:04:05Z",
+  "updated_at": "2024-03-20T16:22:18Z"
+}
+```

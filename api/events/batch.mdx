@@ -1,0 +1,336 @@
+---
+title: "Batch Ingest Events"
+api: "POST /v1/events/batch"
+description: "Send multiple usage events to FlexPrice in a single request"
+---
+
+Use this endpoint when batching usage events for high-volume ingestion or backfilling historical data. More efficient than individual event calls when you have multiple events to send.
+
+## Use Cases
+
+- High-volume event ingestion (logs, metrics, telemetry)
+- Backfilling historical usage data
+- Batch imports from data warehouses
+- Scheduled bulk uploads
+- End-of-day usage summaries
+
+## Request Body
+
+<ParamField body="events" type="array" required>
+  Array of event objects to ingest. Minimum 1 event, maximum 1000 events per request.
+  
+  Each event object has the same structure as the [single event endpoint](/api/events/ingest).
+</ParamField>
+
+### Event Object Structure
+
+<ParamField body="events[].event_name" type="string" required>
+  Unique identifier for the type of event.
+</ParamField>
+
+<ParamField body="events[].external_customer_id" type="string" required>
+  Your system's unique identifier for the customer.
+</ParamField>
+
+<ParamField body="events[].event_id" type="string">
+  Optional idempotency key. Recommended for ensuring exactly-once processing.
+</ParamField>
+
+<ParamField body="events[].customer_id" type="string">
+  FlexPrice's internal customer ID. Optional if using `external_customer_id`.
+</ParamField>
+
+<ParamField body="events[].timestamp" type="string">
+  ISO 8601 timestamp. Defaults to current server time if omitted.
+</ParamField>
+
+<ParamField body="events[].source" type="string">
+  Optional identifier for the event source.
+</ParamField>
+
+<ParamField body="events[].properties" type="object">
+  Arbitrary key-value pairs with event metadata.
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation message: `"Events accepted for processing"`
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://us.api.flexprice.io/v1/events/batch \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "event_name": "api_request",
+        "external_customer_id": "customer_123",
+        "event_id": "req_001",
+        "timestamp": "2024-03-20T10:00:00Z",
+        "properties": {
+          "endpoint": "/v1/users",
+          "method": "GET",
+          "status": 200
+        }
+      },
+      {
+        "event_name": "api_request",
+        "external_customer_id": "customer_123",
+        "event_id": "req_002",
+        "timestamp": "2024-03-20T10:05:00Z",
+        "properties": {
+          "endpoint": "/v1/orders",
+          "method": "POST",
+          "status": 201
+        }
+      },
+      {
+        "event_name": "storage_usage",
+        "external_customer_id": "customer_456",
+        "event_id": "storage_001",
+        "timestamp": "2024-03-20T10:00:00Z",
+        "properties": {
+          "storage_gb": 250.5,
+          "region": "us-east-1"
+        }
+      }
+    ]
+  }'
+```
+
+```javascript Node.js
+import { Flexprice } from '@flexprice/sdk';
+
+const client = new Flexprice({
+  apiKey: process.env.FLEXPRICE_API_KEY,
+  serverURL: 'https://us.api.flexprice.io/v1'
+});
+
+const result = await client.events.ingestBatch({
+  events: [
+    {
+      eventName: 'api_request',
+      externalCustomerId: 'customer_123',
+      eventId: 'req_001',
+      timestamp: new Date('2024-03-20T10:00:00Z'),
+      properties: {
+        endpoint: '/v1/users',
+        method: 'GET',
+        status: 200
+      }
+    },
+    {
+      eventName: 'api_request',
+      externalCustomerId: 'customer_123',
+      eventId: 'req_002',
+      timestamp: new Date('2024-03-20T10:05:00Z'),
+      properties: {
+        endpoint: '/v1/orders',
+        method: 'POST',
+        status: 201
+      }
+    },
+    {
+      eventName: 'storage_usage',
+      externalCustomerId: 'customer_456',
+      eventId: 'storage_001',
+      timestamp: new Date('2024-03-20T10:00:00Z'),
+      properties: {
+        storage_gb: 250.5,
+        region: 'us-east-1'
+      }
+    }
+  ]
+});
+
+console.log(result.message);
+```
+
+```python Python
+from flexprice import Flexprice
+from datetime import datetime
+import os
+
+client = Flexprice(
+    api_key=os.environ['FLEXPRICE_API_KEY'],
+    server_url='https://us.api.flexprice.io/v1'
+)
+
+result = client.events.ingest_batch(
+    events=[
+        {
+            'event_name': 'api_request',
+            'external_customer_id': 'customer_123',
+            'event_id': 'req_001',
+            'timestamp': datetime.fromisoformat('2024-03-20T10:00:00Z'),
+            'properties': {
+                'endpoint': '/v1/users',
+                'method': 'GET',
+                'status': 200
+            }
+        },
+        {
+            'event_name': 'api_request',
+            'external_customer_id': 'customer_123',
+            'event_id': 'req_002',
+            'timestamp': datetime.fromisoformat('2024-03-20T10:05:00Z'),
+            'properties': {
+                'endpoint': '/v1/orders',
+                'method': 'POST',
+                'status': 201
+            }
+        },
+        {
+            'event_name': 'storage_usage',
+            'external_customer_id': 'customer_456',
+            'event_id': 'storage_001',
+            'timestamp': datetime.fromisoformat('2024-03-20T10:00:00Z'),
+            'properties': {
+                'storage_gb': 250.5,
+                'region': 'us-east-1'
+            }
+        }
+    ]
+)
+
+print(result.message)
+```
+
+```go Go
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+    flexprice "github.com/flexprice/go-sdk"
+)
+
+func main() {
+    client := flexprice.New(
+        flexprice.WithAPIKey(os.Getenv("FLEXPRICE_API_KEY")),
+        flexprice.WithServerURL("https://us.api.flexprice.io/v1"),
+    )
+
+    timestamp1, _ := time.Parse(time.RFC3339, "2024-03-20T10:00:00Z")
+    timestamp2, _ := time.Parse(time.RFC3339, "2024-03-20T10:05:00Z")
+    
+    result, err := client.Events.IngestBatch(context.Background(), &flexprice.BulkIngestEventRequest{
+        Events: []*flexprice.IngestEventRequest{
+            {
+                EventName:          "api_request",
+                ExternalCustomerID: "customer_123",
+                EventID:            flexprice.String("req_001"),
+                Timestamp:          &timestamp1,
+                Properties: map[string]interface{}{
+                    "endpoint": "/v1/users",
+                    "method":   "GET",
+                    "status":   200,
+                },
+            },
+            {
+                EventName:          "api_request",
+                ExternalCustomerID: "customer_123",
+                EventID:            flexprice.String("req_002"),
+                Timestamp:          &timestamp2,
+                Properties: map[string]interface{}{
+                    "endpoint": "/v1/orders",
+                    "method":   "POST",
+                    "status":   201,
+                },
+            },
+            {
+                EventName:          "storage_usage",
+                ExternalCustomerID: "customer_456",
+                EventID:            flexprice.String("storage_001"),
+                Timestamp:          &timestamp1,
+                Properties: map[string]interface{}{
+                    "storage_gb": 250.5,
+                    "region":     "us-east-1",
+                },
+            },
+        },
+    })
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    log.Println(result.Message)
+}
+```
+</CodeGroup>
+
+## Response Codes
+
+<ResponseField name="202" type="Accepted">
+  Events accepted for processing. All events are queued and will be processed asynchronously.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  Invalid request. Common issues:
+  - Empty events array
+  - More than 1000 events in a single request
+  - Missing required fields in one or more events
+  - Invalid timestamp format
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Missing or invalid API key.
+</ResponseField>
+
+<ResponseField name="500" type="Server Error">
+  Internal server error. Events were not accepted.
+</ResponseField>
+
+## Limits
+
+- **Batch size**: 1-1000 events per request
+- **Rate limits**: Same as single event endpoint (per-API-key limits apply)
+- **Payload size**: Recommended max 10MB per request
+
+## Best Practices
+
+1. **Optimal batch size**: Use 100-500 events per request for best performance. Larger batches reduce HTTP overhead but may timeout.
+
+2. **Include event IDs**: Always provide unique `event_id` values for idempotency, especially for retries.
+
+3. **Handle partial failures**: If the entire batch fails, consider splitting it into smaller batches and retrying.
+
+4. **Order matters for backfills**: When backfilling, send events in chronological order (oldest first) to ensure accurate billing period calculations.
+
+5. **Monitor ingestion lag**: Use the monitoring endpoint to track processing delays during high-volume ingestion.
+
+6. **Validate before sending**: Check event structure locally before making the API call to avoid rejecting entire batches.
+
+## Backfilling Historical Data
+
+When importing historical usage data:
+
+```javascript
+// Batch events by day for manageable request sizes
+const eventsByDay = groupEventsByDay(historicalEvents);
+
+for (const [day, events] of Object.entries(eventsByDay)) {
+  // Split into chunks of 500
+  const chunks = chunkArray(events, 500);
+  
+  for (const chunk of chunks) {
+    await client.events.ingestBatch({ events: chunk });
+    
+    // Add delay to avoid rate limits
+    await sleep(100);
+  }
+}
+```
+
+## Related
+
+- [Ingest Single Event](/api/events/ingest) - Send one event at a time
+- [Query Events](/api/events/query) - Retrieve ingested events
+- [Meters](/api/meters) - Configure how events are metered

@@ -1,0 +1,265 @@
+---
+title: "List Invoices"
+api: "GET /v1/invoices"
+description: "Use when listing or searching invoices (e.g. admin view or customer history). Returns a paginated list; supports filtering by customer, status, date range."
+---
+
+## Query Parameters
+
+<ParamField query="customer_id" type="string">
+  Filter invoices by customer ID
+</ParamField>
+
+<ParamField query="subscription_id" type="string">
+  Filter invoices by subscription ID
+</ParamField>
+
+<ParamField query="invoice_status" type="string">
+  Filter by invoice status
+  
+  **Values:** `DRAFT`, `FINALIZED`, `VOIDED`, `UNCOLLECTIBLE`
+</ParamField>
+
+<ParamField query="payment_status" type="string">
+  Filter by payment status
+  
+  **Values:** `PENDING`, `PAID`, `UNPAID`, `PARTIALLY_PAID`, `OVERPAID`, `FAILED`
+</ParamField>
+
+<ParamField query="invoice_type" type="string">
+  Filter by invoice type
+  
+  **Values:** `SUBSCRIPTION`, `ONE_TIME`, `CREDIT`, `PRORATION`
+</ParamField>
+
+<ParamField query="due_date_from" type="string">
+  Filter invoices with due date on or after this date (ISO 8601 format)
+</ParamField>
+
+<ParamField query="due_date_to" type="string">
+  Filter invoices with due date on or before this date (ISO 8601 format)
+</ParamField>
+
+<ParamField query="period_start_from" type="string">
+  Filter invoices with billing period starting on or after this date (ISO 8601 format)
+</ParamField>
+
+<ParamField query="period_start_to" type="string">
+  Filter invoices with billing period starting on or before this date (ISO 8601 format)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="10">
+  Number of invoices to return per page (max 100)
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of invoices to skip for pagination
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="created_at">
+  Field to sort by
+  
+  **Values:** `created_at`, `updated_at`, `due_date`, `period_start`, `total`
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="desc">
+  Sort order
+  
+  **Values:** `asc`, `desc`
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of invoice objects
+  
+  <Expandable title="Invoice object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the invoice
+    </ResponseField>
+    
+    <ResponseField name="customer_id" type="string">
+      ID of the customer this invoice belongs to
+    </ResponseField>
+    
+    <ResponseField name="subscription_id" type="string">
+      ID of the subscription (if applicable)
+    </ResponseField>
+    
+    <ResponseField name="invoice_number" type="string">
+      Human-readable invoice number
+    </ResponseField>
+    
+    <ResponseField name="invoice_type" type="string">
+      Type of invoice (SUBSCRIPTION, ONE_TIME, CREDIT, PRORATION)
+    </ResponseField>
+    
+    <ResponseField name="invoice_status" type="string">
+      Current status (DRAFT, FINALIZED, VOIDED, UNCOLLECTIBLE)
+    </ResponseField>
+    
+    <ResponseField name="payment_status" type="string">
+      Payment status (PENDING, PAID, UNPAID, PARTIALLY_PAID, OVERPAID, FAILED)
+    </ResponseField>
+    
+    <ResponseField name="currency" type="string">
+      Three-letter ISO currency code (e.g., USD, EUR)
+    </ResponseField>
+    
+    <ResponseField name="amount_due" type="string">
+      Total amount due
+    </ResponseField>
+    
+    <ResponseField name="amount_paid" type="string">
+      Amount already paid
+    </ResponseField>
+    
+    <ResponseField name="amount_remaining" type="string">
+      Remaining amount to be paid
+    </ResponseField>
+    
+    <ResponseField name="subtotal" type="string">
+      Subtotal before taxes and discounts
+    </ResponseField>
+    
+    <ResponseField name="total_tax" type="string">
+      Total tax amount
+    </ResponseField>
+    
+    <ResponseField name="total_discount" type="string">
+      Total discount amount
+    </ResponseField>
+    
+    <ResponseField name="total" type="string">
+      Final total amount
+    </ResponseField>
+    
+    <ResponseField name="total_prepaid_credits_applied" type="string">
+      Total prepaid credits applied to this invoice
+    </ResponseField>
+    
+    <ResponseField name="due_date" type="string">
+      Date when payment is due (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="period_start" type="string">
+      Start of billing period (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="period_end" type="string">
+      End of billing period (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="billing_period" type="string">
+      Billing period (MONTHLY, YEARLY, etc.)
+    </ResponseField>
+    
+    <ResponseField name="billing_reason" type="string">
+      Reason for invoice creation
+    </ResponseField>
+    
+    <ResponseField name="line_items" type="array">
+      Array of line items included in the invoice
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object">
+      Custom metadata key-value pairs
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      Timestamp when invoice was created
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      Timestamp when invoice was last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of invoices matching the filter criteria
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  Number of invoices returned per page
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Number of invoices skipped
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.flexprice.io/v1/invoices?customer_id=cust_1234&invoice_status=FINALIZED&limit=20" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```python Python
+client = Flexprice(api_key="YOUR_API_KEY")
+
+invoices = client.invoices.list(
+    customer_id="cust_1234",
+    invoice_status="FINALIZED",
+    limit=20
+)
+```
+
+```typescript TypeScript
+const client = new Flexprice({ apiKey: "YOUR_API_KEY" });
+
+const invoices = await client.invoices.list({
+  customerId: "cust_1234",
+  invoiceStatus: "FINALIZED",
+  limit: 20
+});
+```
+
+```go Go
+client := flexprice.NewClient("YOUR_API_KEY")
+
+invoices, err := client.Invoices.List(context.Background(), &flexprice.InvoiceListParams{
+    CustomerID: "cust_1234",
+    InvoiceStatus: "FINALIZED",
+    Limit: 20,
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "data": [
+    {
+      "id": "inv_1234567890",
+      "customer_id": "cust_1234",
+      "subscription_id": "sub_5678",
+      "invoice_number": "INV-2024-0001",
+      "invoice_type": "SUBSCRIPTION",
+      "invoice_status": "FINALIZED",
+      "payment_status": "PAID",
+      "currency": "usd",
+      "amount_due": "100.00",
+      "amount_paid": "100.00",
+      "amount_remaining": "0.00",
+      "subtotal": "100.00",
+      "total_tax": "0.00",
+      "total_discount": "0.00",
+      "total": "100.00",
+      "total_prepaid_credits_applied": "0.00",
+      "due_date": "2024-02-01T00:00:00Z",
+      "period_start": "2024-01-01T00:00:00Z",
+      "period_end": "2024-01-31T23:59:59Z",
+      "billing_period": "MONTHLY",
+      "billing_reason": "subscription_cycle",
+      "line_items": [],
+      "metadata": {},
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0
+}
+```
+</ResponseExample>

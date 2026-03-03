@@ -1,0 +1,143 @@
+---
+title: Customers
+description: Managing customers in FlexPrice's billing system
+---
+
+Customers are the entities you bill in FlexPrice. Each customer can have subscriptions, usage events, invoices, and wallets.
+
+## Customer Entity
+
+A customer in FlexPrice has the following key properties:
+
+- `id` - Unique FlexPrice identifier (UUID)
+- `external_customer_id` - Your system's customer ID
+- `name` - Customer display name
+- `email` - Contact email
+- `address` - Billing address fields
+- `metadata` - Custom key-value data
+- `parent_customer_id` - For hierarchical relationships
+
+<Note>
+The `external_customer_id` allows you to use your existing customer IDs when sending events and creating subscriptions.
+</Note>
+
+## Creating Customers
+
+You can create customers via the API:
+
+```bash
+curl -X POST https://api.flexprice.io/v1/customers \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_customer_id": "cust_123",
+    "name": "Acme Corporation",
+    "email": "billing@acme.com",
+    "metadata": {
+      "segment": "enterprise",
+      "region": "us-west"
+    }
+  }'
+```
+
+## Customer Lifecycle
+
+<Steps>
+  <Step title="Creation">
+    Customer is created when they sign up or are imported
+  </Step>
+  <Step title="Subscription">
+    Customer subscribes to a plan and starts generating usage
+  </Step>
+  <Step title="Billing">
+    Invoices are generated based on subscription and usage
+  </Step>
+  <Step title="Payment">
+    Customer pays invoices through configured payment provider
+  </Step>
+</Steps>
+
+## Hierarchical Customers
+
+FlexPrice supports parent-child customer relationships:
+
+```json
+{
+  "name": "Department A",
+  "parent_customer_id": "parent_customer_uuid",
+  "external_customer_id": "dept_a"
+}
+```
+
+Use cases:
+- **Departments** - Bill departments separately under a parent organization
+- **Teams** - Track team-level usage within a company
+- **Resellers** - Manage end customers under reseller accounts
+
+<Info>
+Parent customers can view aggregated usage and invoices across all child customers.
+</Info>
+
+## External ID Mapping
+
+The `external_customer_id` field enables seamless integration:
+
+- Use your existing customer IDs
+- No need to store FlexPrice UUIDs
+- Reference customers in events and subscriptions
+
+```javascript
+// Send events using your customer ID
+await flexprice.events.ingest({
+  external_customer_id: "cust_123",  // Your ID
+  event_name: "api_call",
+  timestamp: new Date().toISOString()
+});
+```
+
+## Customer Metadata
+
+Store custom data with the `metadata` field:
+
+```json
+{
+  "metadata": {
+    "segment": "enterprise",
+    "industry": "fintech",
+    "account_manager": "jane@yourcompany.com",
+    "contract_end": "2025-12-31"
+  }
+}
+```
+
+<Tip>
+Use metadata for segmentation, reporting, and business logic without modifying your database schema.
+</Tip>
+
+## Integration Mapping
+
+Connect FlexPrice customers to external systems:
+
+- Stripe customer IDs
+- HubSpot contact IDs
+- QuickBooks customer references
+- Custom CRM identifiers
+
+This enables automatic sync of billing data to your existing tools.
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Create Customer" href="/api/customers/create" icon="plus">
+    API reference for customer creation
+  </Card>
+  <Card title="Subscriptions" href="/concepts/subscriptions" icon="repeat">
+    Learn about customer subscriptions
+  </Card>
+  <Card title="Invoices" href="/concepts/invoicing" icon="file-invoice">
+    Understand customer invoicing
+  </Card>
+  <Card title="Wallets" href="/concepts/credits" icon="wallet">
+    Manage customer credit balances
+  </Card>
+</CardGroup>

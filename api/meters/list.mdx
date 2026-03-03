@@ -1,0 +1,137 @@
+---
+title: "List Meters"
+api: "GET /v1/meters"
+description: "Retrieve a paginated list of all meters in your environment."
+---
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default="10">
+  Maximum number of meters to return.
+  
+  **Example:** `20`
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of meters to skip before starting to return results.
+  
+  **Example:** `10`
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Cursor for pagination (alternative to offset).
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of meter objects.
+  
+  <Expandable title="meter properties">
+    <ResponseField name="id" type="string">
+      Unique identifier for the meter.
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Human-readable name for the meter.
+    </ResponseField>
+    
+    <ResponseField name="tenant_id" type="string">
+      Tenant ID that owns this meter.
+    </ResponseField>
+    
+    <ResponseField name="event_name" type="string">
+      Name of the event being tracked.
+    </ResponseField>
+    
+    <ResponseField name="aggregation" type="object">
+      Aggregation configuration.
+    </ResponseField>
+    
+    <ResponseField name="filters" type="array">
+      Array of filters applied to events.
+    </ResponseField>
+    
+    <ResponseField name="reset_usage" type="string">
+      Usage reset configuration.
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Status of the meter.
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp when the meter was created.
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp when the meter was last updated.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of meters matching the query.
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  Maximum number of results returned.
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  Number of results skipped.
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  Whether there are more results available.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request GET \
+  --url 'https://api.flexprice.io/v1/meters?limit=20&offset=0' \
+  --header 'Authorization: Bearer <token>'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    {
+      "id": "meter_550e8400e29b41d4a716446655440000",
+      "name": "API Usage Meter",
+      "tenant_id": "tenant_123",
+      "event_name": "api_request",
+      "aggregation": {
+        "type": "COUNT"
+      },
+      "filters": [],
+      "reset_usage": "BILLING_PERIOD",
+      "status": "published",
+      "created_at": "2024-03-20T15:04:05Z",
+      "updated_at": "2024-03-20T15:04:05Z"
+    },
+    {
+      "id": "meter_6a1f94c1a3eb42e5b827557766551111",
+      "name": "Compute Hours Meter",
+      "tenant_id": "tenant_123",
+      "event_name": "compute_usage",
+      "aggregation": {
+        "type": "SUM",
+        "field": "hours"
+      },
+      "filters": [],
+      "reset_usage": "BILLING_PERIOD",
+      "status": "published",
+      "created_at": "2024-03-21T10:15:30Z",
+      "updated_at": "2024-03-21T10:15:30Z"
+    }
+  ],
+  "total": 2,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
+}
+```

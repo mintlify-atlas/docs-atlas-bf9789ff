@@ -1,0 +1,480 @@
+---
+title: "Event Ingestion"
+description: "Send usage events to FlexPrice for metering and billing"
+---
+
+Events are the foundation of usage-based billing in FlexPrice. An event represents a single measurable activity from your application (e.g., API request, GB stored, compute minute).
+
+## Event Structure
+
+Every event must include these required fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `event_name` | string | Yes | Identifier for the event type (e.g., `api_request`) |
+| `external_customer_id` | string | Yes | Customer ID in your system |
+| `timestamp` | ISO 8601 | Yes | When the event occurred (UTC) |
+| `properties` | object | No | Custom event data for filtering and aggregation |
+| `event_id` | string | No | Idempotency key (auto-generated if omitted) |
+| `customer_id` | string | No | FlexPrice customer ID (resolved automatically) |
+| `source` | string | No | Event source identifier |
+
+### Event Schema
+
+<CodeGroup>
+```json Complete Event
+{
+  "event_name": "api_request",
+  "external_customer_id": "customer_123",
+  "timestamp": "2024-03-20T15:04:05Z",
+  "event_id": "evt_unique_12345",
+  "source": "production-api",
+  "properties": {
+    "endpoint": "/api/v1/users",
+    "method": "GET",
+    "response_time_ms": 45,
+    "status_code": 200,
+    "bytes_transferred": 2048
+  }
+}
+```
+
+```json Minimal Event
+{
+  "event_name": "api_request",
+  "external_customer_id": "customer_123",
+  "timestamp": "2024-03-20T15:04:05Z"
+}
+```
+</CodeGroup>
+
+## Sending Events
+
+### Single Event Ingestion
+
+Use `POST /v1/events` to send individual events:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://us.api.flexprice.io/v1/events \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_name": "api_request",
+    "external_customer_id": "customer_123",
+    "timestamp": "2024-03-20T15:04:05Z",
+    "properties": {
+      "endpoint": "/api/v1/users",
+      "method": "GET"
+    }
+  }'
+```
+
+```javascript Node.js
+const flexprice = require('@flexprice/sdk');
+
+const client = new flexprice.Flexprice({
+  apiKey: process.env.FLEXPRICE_API_KEY,
+  serverUrl: 'https://us.api.flexprice.io/v1'
+});
+
+await client.events.ingestEvent({
+  eventName: 'api_request',
+  externalCustomerId: 'customer_123',
+  timestamp: new Date().toISOString(),
+  properties: {
+    endpoint: '/api/v1/users',
+    method: 'GET'
+  }
+});
+```
+
+```python Python
+from flexprice import Flexprice
+from datetime import datetime
+
+client = Flexprice(
+    api_key="YOUR_API_KEY",
+    server_url="https://us.api.flexprice.io/v1"
+)
+
+client.events.ingest_event(
+    event_name="api_request",
+    external_customer_id="customer_123",
+    timestamp=datetime.utcnow().isoformat(),
+    properties={
+        "endpoint": "/api/v1/users",
+        "method": "GET"
+    }
+)
+```
+
+```go Go
+package main
+
+import (
+    "context"
+    "time"
+    flexprice "github.com/flexprice/go-sdk"
+)
+
+func main() {
+    client := flexprice.New(
+        flexprice.WithSecurity("YOUR_API_KEY"),
+        flexprice.WithServerURL("https://us.api.flexprice.io/v1"),
+    )
+    
+    ctx := context.Background()
+    timestamp := time.Now().UTC()
+    
+    _, err := client.Events.IngestEvent(ctx, &flexprice.IngestEventRequest{
+        EventName:          "api_request",
+        ExternalCustomerID: "customer_123",
+        Timestamp:          &timestamp,
+        Properties: map[string]interface{}{
+            "endpoint": "/api/v1/users",
+            "method":   "GET",
+        },
+    })
+}
+```
+</CodeGroup>
+
+**Response** (HTTP 202):
+
+```json
+{
+  "message": "Event accepted for processing",
+  "event_id": "evt_unique_12345"
+}
+```
+
+<Note>
+Events are processed **asynchronously**. A 202 response means the event was accepted and queued, not that processing is complete. Processing typically completes within seconds.
+</Note>
+
+### Bulk Event Ingestion
+
+For high-volume scenarios or backfilling historical data, use `POST /v1/events/bulk`:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://us.api.flexprice.io/v1/events/bulk \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "event_name": "api_request",
+        "external_customer_id": "customer_123",
+        "timestamp": "2024-03-20T15:04:05Z"
+      },
+      {
+        "event_name": "api_request",
+        "external_customer_id": "customer_456",
+        "timestamp": "2024-03-20T15:05:12Z"
+      }
+    ]
+  }'
+```
+
+```python Python
+client.events.bulk_ingest_events(
+    events=[
+        {
+            "event_name": "api_request",
+            "external_customer_id": "customer_123",
+            "timestamp": "2024-03-20T15:04:05Z"
+        },
+        {
+            "event_name": "api_request",
+            "external_customer_id": "customer_456",
+            "timestamp": "2024-03-20T15:05:12Z"
+        }
+    ]
+)
+```
+</CodeGroup>
+
+**Limits:**
+- Maximum 1,000 events per bulk request
+- For larger datasets, send multiple bulk requests
+
+**Response** (HTTP 202):
+
+```json
+{
+  "message": "Events accepted for processing"
+}
+```
+
+## Event Properties
+
+The `properties` field contains custom data specific to your event:
+
+### Best Practices
+
+<Steps>
+  <Step title="Use Consistent Property Names">
+    Maintain consistent naming across events of the same type. Use `snake_case` for property keys.
+  </Step>
+  
+  <Step title="Include Filterable Dimensions">
+    Add properties you'll use for filtering (region, product tier, feature flag, etc.).
+  </Step>
+  
+  <Step title="Store Aggregatable Values">
+    Include numeric fields you'll aggregate (bytes, duration, count, etc.).
+  </Step>
+  
+  <Step title="Keep Properties Flat">
+    Nested objects work, but top-level properties are easier to filter and aggregate.
+  </Step>
+</Steps>
+
+### Example Properties by Use Case
+
+<CodeGroup>
+```json API Metering
+{
+  "properties": {
+    "endpoint": "/api/v1/users",
+    "method": "GET",
+    "response_time_ms": 45,
+    "status_code": 200,
+    "bytes_sent": 1024,
+    "bytes_received": 2048
+  }
+}
+```
+
+```json Storage Metering
+{
+  "properties": {
+    "bytes": 1073741824,
+    "region": "us-west-2",
+    "storage_class": "standard",
+    "bucket_name": "customer-data"
+  }
+}
+```
+
+```json Compute Metering
+{
+  "properties": {
+    "duration_seconds": 3600,
+    "cpu_cores": 4,
+    "memory_gb": 16,
+    "instance_type": "c5.xlarge",
+    "region": "us-east-1"
+  }
+}
+```
+
+```json AI/ML Metering
+{
+  "properties": {
+    "model": "gpt-4",
+    "input_tokens": 150,
+    "output_tokens": 300,
+    "total_tokens": 450,
+    "request_id": "req_abc123"
+  }
+}
+```
+</CodeGroup>
+
+## Idempotency
+
+FlexPrice uses `event_id` for idempotency to prevent duplicate billing:
+
+```json
+{
+  "event_id": "unique_key_from_your_system",
+  "event_name": "api_request",
+  "external_customer_id": "customer_123",
+  "timestamp": "2024-03-20T15:04:05Z"
+}
+```
+
+- If you send the same `event_id` twice, only the first event is processed
+- If omitted, FlexPrice generates a UUID (no deduplication)
+- Use your own IDs (request ID, transaction ID) for guaranteed deduplication
+
+## Timestamps
+
+### Format
+
+Timestamps must be in **ISO 8601 format** with timezone:
+
+```json
+{
+  "timestamp": "2024-03-20T15:04:05Z"
+}
+```
+
+Supported formats:
+- `2024-03-20T15:04:05Z` (UTC)
+- `2024-03-20T15:04:05.123456789Z` (with nanoseconds)
+- `2024-03-20T15:04:05-07:00` (with timezone offset)
+
+### Backfilling Historical Events
+
+You can send events with past timestamps for backfilling:
+
+```json
+{
+  "event_name": "api_request",
+  "external_customer_id": "customer_123",
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
+
+<Note>
+Backfilled events are processed normally and will affect usage calculations for their respective time periods. Ensure billing periods haven't been finalized before backfilling.
+</Note>
+
+## Error Handling
+
+### Validation Errors (400)
+
+```json
+{
+  "error": "invalid request payload",
+  "hint": "Invalid request payload",
+  "details": {
+    "field": "external_customer_id",
+    "error": "required field missing"
+  }
+}
+```
+
+Common validation errors:
+- Missing required fields (`event_name`, `external_customer_id`, `timestamp`)
+- Invalid timestamp format
+- Invalid data types in properties
+
+### Authentication Errors (401)
+
+```json
+{
+  "error": "unauthorized",
+  "hint": "Invalid or missing API key"
+}
+```
+
+### Rate Limiting (429)
+
+FlexPrice applies rate limits per tenant:
+
+```json
+{
+  "error": "rate limit exceeded",
+  "hint": "Too many requests. Please try again later."
+}
+```
+
+Implement exponential backoff when retrying:
+
+```python
+import time
+import random
+
+def send_with_retry(event, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return client.events.ingest_event(**event)
+        except RateLimitError:
+            if attempt == max_retries - 1:
+                raise
+            sleep_time = (2 ** attempt) + random.random()
+            time.sleep(sleep_time)
+```
+
+## Querying Events
+
+Retrieve raw events for debugging or export:
+
+```bash
+curl -X POST https://us.api.flexprice.io/v1/events/query \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_customer_id": "customer_123",
+    "event_name": "api_request",
+    "start_time": "2024-03-01T00:00:00Z",
+    "end_time": "2024-03-31T23:59:59Z",
+    "page_size": 50
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "events": [
+    {
+      "id": "evt_abc123",
+      "event_name": "api_request",
+      "external_customer_id": "customer_123",
+      "timestamp": "2024-03-20T15:04:05Z",
+      "properties": {
+        "endpoint": "/api/v1/users",
+        "method": "GET"
+      }
+    }
+  ],
+  "has_more": true,
+  "total_count": 150
+}
+```
+
+See [Query Events API](/api-reference/events/list-raw-events) for full documentation.
+
+## Best Practices
+
+<Steps>
+  <Step title="Send Events in Real-Time">
+    Send events as they occur for accurate, up-to-date usage tracking. Don't batch unnecessarily.
+  </Step>
+  
+  <Step title="Use Bulk API for Historical Data">
+    When backfilling or importing data, use `/events/bulk` for better performance.
+  </Step>
+  
+  <Step title="Implement Retry Logic">
+    Network failures happen. Retry failed requests with exponential backoff.
+  </Step>
+  
+  <Step title="Set Idempotency Keys">
+    Always provide `event_id` to prevent duplicate billing from retries.
+  </Step>
+  
+  <Step title="Monitor Event Processing">
+    Use the monitoring endpoint to track ingestion lag and event counts.
+  </Step>
+  
+  <Step title="Validate Before Sending">
+    Check for required fields and valid formats in your application before sending.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Meters" icon="gauge" href="/metering/meters">
+    Create meters to aggregate events into usage
+  </Card>
+  
+  <Card title="Aggregation Methods" icon="calculator" href="/metering/aggregations">
+    Learn about aggregation types
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/events/ingest-event">
+    Full API documentation
+  </Card>
+  
+  <Card title="Query Usage" icon="chart-line" href="/api-reference/events/get-usage-by-meter">
+    Retrieve aggregated usage
+  </Card>
+</CardGroup>

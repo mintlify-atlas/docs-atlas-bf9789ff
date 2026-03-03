@@ -1,0 +1,309 @@
+---
+title: "Update Customer"
+api: "PUT /v1/customers/{id}"
+description: "Update an existing customer's details"
+---
+
+Use this endpoint when updating customer details (e.g., name, email, or metadata). You can identify the customer by FlexPrice ID or external customer ID.
+
+## Path Parameters
+
+<ParamField path="id" type="string">
+  The unique FlexPrice customer ID (e.g., `cust_abc123xyz789`). Can be provided as path parameter or query parameter.
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="id" type="string">
+  The unique FlexPrice customer ID. Alternative to path parameter.
+</ParamField>
+
+<ParamField query="external_customer_id" type="string">
+  The external customer ID from your system. Use this to update by your own identifier instead of the FlexPrice ID.
+</ParamField>
+
+<Note>
+  Provide either `id` (as path or query parameter) or `external_customer_id`, but not both. If both are provided, they must refer to the same customer.
+</Note>
+
+## Request Body
+
+All fields are optional. Only the fields you provide will be updated.
+
+<ParamField body="external_id" type="string">
+  Updated external identifier for the customer.
+</ParamField>
+
+<ParamField body="name" type="string">
+  Updated name or company name.
+</ParamField>
+
+<ParamField body="email" type="string">
+  Updated email address. Must be a valid email format if provided.
+</ParamField>
+
+<ParamField body="address_line1" type="string">
+  Updated primary address line. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="address_line2" type="string">
+  Updated secondary address line. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="address_city" type="string">
+  Updated city name. Maximum 100 characters.
+</ParamField>
+
+<ParamField body="address_state" type="string">
+  Updated state, province, or region name. Maximum 100 characters.
+</ParamField>
+
+<ParamField body="address_postal_code" type="string">
+  Updated postal code. Maximum 20 characters.
+</ParamField>
+
+<ParamField body="address_country" type="string">
+  Updated two-letter ISO 3166-1 alpha-2 country code.
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Updated metadata key-value pairs. This will replace the existing metadata completely.
+</ParamField>
+
+<ParamField body="parent_customer_id" type="string">
+  Updated parent customer FlexPrice ID.
+</ParamField>
+
+<ParamField body="parent_customer_external_id" type="string">
+  Updated parent customer external ID. Provide either `parent_customer_id` or `parent_customer_external_id`, but not both.
+</ParamField>
+
+<ParamField body="integration_entity_mapping" type="array">
+  Updated provider integration mappings.
+  
+  <Expandable title="Integration Entity Mapping Object">
+    <ParamField body="provider" type="string" required>
+      The integration provider name. Must be one of: `stripe`, `razorpay`, `paypal`.
+    </ParamField>
+    
+    <ParamField body="id" type="string" required>
+      The external entity ID from the provider.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  The unique FlexPrice customer ID.
+</ResponseField>
+
+<ResponseField name="external_id" type="string">
+  The external identifier.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The customer's name or company name.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The customer's email address.
+</ResponseField>
+
+<ResponseField name="address_line1" type="string">
+  Primary address line.
+</ResponseField>
+
+<ResponseField name="address_line2" type="string">
+  Secondary address line.
+</ResponseField>
+
+<ResponseField name="address_city" type="string">
+  City name.
+</ResponseField>
+
+<ResponseField name="address_state" type="string">
+  State or region name.
+</ResponseField>
+
+<ResponseField name="address_postal_code" type="string">
+  Postal code.
+</ResponseField>
+
+<ResponseField name="address_country" type="string">
+  Two-letter country code.
+</ResponseField>
+
+<ResponseField name="parent_customer_id" type="string">
+  The parent customer ID if applicable.
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata key-value pairs.
+</ResponseField>
+
+<ResponseField name="environment_id" type="string">
+  The environment ID.
+</ResponseField>
+
+<ResponseField name="tenant_id" type="string">
+  The tenant ID.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The customer status.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of creation.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of last update.
+</ResponseField>
+
+<ResponseField name="created_by" type="string">
+  The ID of the user who created the customer.
+</ResponseField>
+
+<ResponseField name="updated_by" type="string">
+  The ID of the user who last updated the customer.
+</ResponseField>
+
+<RequestExample>
+```bash Update by ID
+curl -X PUT https://api.flexprice.io/v1/customers/cust_abc123xyz789 \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corp (Updated)",
+    "email": "billing-new@acme.com",
+    "metadata": {
+      "plan_tier": "enterprise_plus",
+      "renewal_date": "2025-01-15"
+    }
+  }'
+```
+
+```bash Update by External ID
+curl -X PUT "https://api.flexprice.io/v1/customers?external_customer_id=user_12345" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "new-billing@acme.com",
+    "address_city": "Los Angeles"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.flexprice.io/v1/customers/cust_abc123xyz789',
+  {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: 'Acme Corp (Updated)',
+      email: 'billing-new@acme.com',
+      metadata: {
+        plan_tier: 'enterprise_plus',
+        renewal_date: '2025-01-15'
+      }
+    })
+  }
+);
+
+const customer = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.put(
+    'https://api.flexprice.io/v1/customers/cust_abc123xyz789',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    },
+    json={
+        'name': 'Acme Corp (Updated)',
+        'email': 'billing-new@acme.com',
+        'metadata': {
+            'plan_tier': 'enterprise_plus',
+            'renewal_date': '2025-01-15'
+        }
+    }
+)
+
+customer = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "cust_abc123xyz789",
+  "external_id": "user_12345",
+  "name": "Acme Corp (Updated)",
+  "email": "billing-new@acme.com",
+  "address_line1": "123 Main Street",
+  "address_line2": "",
+  "address_city": "San Francisco",
+  "address_state": "CA",
+  "address_postal_code": "94105",
+  "address_country": "US",
+  "parent_customer_id": null,
+  "metadata": {
+    "plan_tier": "enterprise_plus",
+    "renewal_date": "2025-01-15"
+  },
+  "environment_id": "env_prod_001",
+  "tenant_id": "tenant_001",
+  "status": "published",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-20T14:45:00Z",
+  "created_by": "user_admin",
+  "updated_by": "user_admin"
+}
+```
+
+```json 400 - Bad Request
+{
+  "error": {
+    "code": "validation_error",
+    "message": "either id or external_customer_id is required",
+    "hint": "Provide id as query parameter (?id=...) or provide external_customer_id as query parameter (?external_customer_id=...)"
+  }
+}
+```
+
+```json 404 - Not Found
+{
+  "error": {
+    "code": "not_found",
+    "message": "Customer not found",
+    "hint": "The customer ID or external ID provided does not exist"
+  }
+}
+```
+</ResponseExample>
+
+## Partial Updates
+
+This endpoint supports partial updates, meaning you only need to send the fields you want to change. All other fields will remain unchanged.
+
+**Example**: To update only the email address:
+
+```json
+{
+  "email": "new-email@acme.com"
+}
+```
+
+## Metadata
+
+<Warning>
+  The `metadata` field replaces the entire existing metadata object. If you want to preserve existing keys, you must include them in your update request.
+</Warning>

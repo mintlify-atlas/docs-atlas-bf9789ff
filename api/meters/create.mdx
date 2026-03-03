@@ -1,0 +1,178 @@
+---
+title: "Create Meter"
+api: "POST /v1/meters"
+description: "Create a new meter to track usage events with configurable aggregation and filtering."
+---
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the meter.
+  
+  **Example:** `"API Usage Meter"`
+</ParamField>
+
+<ParamField body="event_name" type="string" required>
+  Name of the event to track. Must match the event name sent via the events API.
+  
+  **Example:** `"api_request"`
+</ParamField>
+
+<ParamField body="aggregation" type="object" required>
+  Defines how to aggregate the usage events.
+  
+  <Expandable title="aggregation properties">
+    <ParamField body="aggregation.type" type="string" required>
+      Aggregation method to apply. 
+      
+      **Options:** `"COUNT"`, `"SUM"`, `"MAX"`, `"UNIQUE_COUNT"`, `"LATEST"`
+    </ParamField>
+    
+    <ParamField body="aggregation.field" type="string">
+      Property name in event data to aggregate (required for SUM, MAX, LATEST).
+      
+      **Example:** `"tokens"`
+    </ParamField>
+    
+    <ParamField body="aggregation.expression" type="string">
+      Optional CEL expression to compute per-event quantity from event properties. When set, replaces field-based extraction.
+      
+      **Example:** `"token * duration * pixel"`
+    </ParamField>
+    
+    <ParamField body="aggregation.multiplier" type="string">
+      Decimal multiplier to apply to the aggregated value.
+      
+      **Example:** `"1.5"`
+    </ParamField>
+    
+    <ParamField body="aggregation.bucket_size" type="string">
+      Window size for bucketed aggregations.
+      
+      **Options:** `"HOUR"`, `"DAY"`, `"MONTH"`
+    </ParamField>
+    
+    <ParamField body="aggregation.group_by" type="string">
+      Property name to group by before aggregating (currently only supported for MAX with bucket_size).
+      
+      **Example:** `"user_id"`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="filters" type="array">
+  Array of filters to apply before aggregation.
+  
+  <Expandable title="filter properties">
+    <ParamField body="filters[].key" type="string" required>
+      Property name in event data to filter on.
+      
+      **Example:** `"region"`
+    </ParamField>
+    
+    <ParamField body="filters[].values" type="array" required>
+      Array of values to match (OR condition).
+      
+      **Example:** `["us-east-1", "us-west-2"]`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="reset_usage" type="string" required>
+  Determines when usage resets.
+  
+  **Options:** `"BILLING_PERIOD"`, `"NEVER"`
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the meter.
+  
+  **Example:** `"meter_550e8400e29b41d4a716446655440000"`
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Human-readable name for the meter.
+</ResponseField>
+
+<ResponseField name="tenant_id" type="string">
+  Tenant ID that owns this meter.
+</ResponseField>
+
+<ResponseField name="event_name" type="string">
+  Name of the event being tracked.
+</ResponseField>
+
+<ResponseField name="aggregation" type="object">
+  Aggregation configuration.
+</ResponseField>
+
+<ResponseField name="filters" type="array">
+  Array of filters applied to events.
+</ResponseField>
+
+<ResponseField name="reset_usage" type="string">
+  Usage reset configuration.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Status of the meter.
+  
+  **Values:** `"published"`, `"draft"`, `"archived"`
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the meter was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp when the meter was last updated.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request POST \
+  --url https://api.flexprice.io/v1/meters \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "API Usage Meter",
+    "event_name": "api_request",
+    "aggregation": {
+      "type": "COUNT"
+    },
+    "filters": [
+      {
+        "key": "method",
+        "values": ["GET", "POST"]
+      }
+    ],
+    "reset_usage": "BILLING_PERIOD"
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "meter_550e8400e29b41d4a716446655440000",
+  "name": "API Usage Meter",
+  "tenant_id": "tenant_123",
+  "event_name": "api_request",
+  "aggregation": {
+    "type": "COUNT"
+  },
+  "filters": [
+    {
+      "key": "method",
+      "values": ["GET", "POST"]
+    }
+  ],
+  "reset_usage": "BILLING_PERIOD",
+  "status": "published",
+  "created_at": "2024-03-20T15:04:05Z",
+  "updated_at": "2024-03-20T15:04:05Z"
+}
+```

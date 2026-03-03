@@ -1,0 +1,174 @@
+---
+title: API Overview
+description: Introduction to the FlexPrice API
+---
+
+FlexPrice provides a comprehensive REST API for managing usage-based billing, metering, subscriptions, and pricing. The API follows REST principles and returns JSON-encoded responses.
+
+## Base URL
+
+The FlexPrice API is available at the following base URLs depending on your deployment:
+
+<CodeGroup>
+```text Local Development
+http://localhost:8080/v1
+```
+
+```text Cloud (US)
+https://us.api.flexprice.io/v1
+```
+</CodeGroup>
+
+<Note>
+All API endpoints are prefixed with `/v1` to indicate the API version. Make sure to include this in your requests.
+</Note>
+
+## API Characteristics
+
+### REST Principles
+
+The FlexPrice API follows REST conventions:
+
+- Uses standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`)
+- Returns appropriate HTTP status codes
+- Accepts and returns JSON payloads
+- Uses resource-oriented URLs
+
+### Request Format
+
+All `POST` and `PUT` requests should include a `Content-Type: application/json` header and JSON-formatted body.
+
+```bash Example Request
+curl -X POST http://localhost:8080/v1/customers \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_customer_id": "cus_123",
+    "name": "Acme Corp",
+    "email": "billing@acme.com"
+  }'
+```
+
+### Response Format
+
+All API responses return JSON with a consistent structure. Successful responses include the requested data:
+
+```json Success Response
+{
+  "id": "cus_abc123",
+  "external_customer_id": "cus_123",
+  "name": "Acme Corp",
+  "email": "billing@acme.com",
+  "created_at": "2024-03-15T10:30:00Z"
+}
+```
+
+Error responses follow a standard format (see [Error Handling](/api/errors)).
+
+## API Resources
+
+The FlexPrice API is organized around key resources:
+
+### Core Billing
+
+- **Customers** - Manage customer accounts and billing information
+- **Plans** - Define pricing plans and billing models
+- **Subscriptions** - Manage customer subscriptions to plans
+- **Invoices** - Generate and manage invoices
+- **Payments** - Process and track payments
+
+### Metering & Usage
+
+- **Events** - Ingest usage events for billing
+- **Meters** - Define what to measure and how
+- **Features** - Manage feature flags and limits
+- **Entitlements** - Control customer access to features
+
+### Pricing
+
+- **Prices** - Define pricing models (per-unit, tiered, volume)
+- **Price Units** - Units of measurement (API calls, GB, seats)
+- **Addons** - Optional add-ons to plans
+- **Coupons** - Discount codes and promotions
+
+### Credits & Wallets
+
+- **Wallets** - Prepaid credit balances
+- **Credit Grants** - Allocate credits to customers
+- **Credit Notes** - Issue refunds or credits
+
+### Configuration
+
+- **Environments** - Manage production and test environments
+- **Secrets** - API keys and integration credentials
+- **Webhooks** - Event notifications and integrations
+
+## Rate Limits
+
+FlexPrice implements rate limiting to ensure API stability. Rate limit information is included in response headers:
+
+- `X-RateLimit-Limit` - Maximum requests allowed per window
+- `X-RateLimit-Remaining` - Requests remaining in current window
+- `X-RateLimit-Reset` - Time when the rate limit resets
+
+If you exceed the rate limit, the API returns a `429 Too Many Requests` status code.
+
+## Idempotency
+
+For safe retries, include an `Idempotency-Key` header with a unique value (UUID recommended) in `POST` requests. The API will return the same result for requests with the same idempotency key:
+
+```bash Idempotent Request
+curl -X POST http://localhost:8080/v1/events \
+  -H "X-API-Key: your-api-key" \
+  -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_name": "api_call",
+    "external_customer_id": "cus_123",
+    "timestamp": "2024-03-15T10:30:00Z"
+  }'
+```
+
+## Versioning
+
+The current API version is `v1`, indicated by the `/v1` prefix in all endpoints. Breaking changes will be introduced in new API versions while maintaining backward compatibility for existing versions.
+
+## SDKs & Tools
+
+FlexPrice provides official SDKs and tools:
+
+- **Go SDK** - [`github.com/flexprice/go-sdk`](https://github.com/flexprice/go-sdk)
+- **Python SDK** - [`pip install flexprice`](https://github.com/flexprice/python-sdk)
+- **TypeScript/JavaScript SDK** - [`npm i @flexprice/sdk`](https://github.com/flexprice/javascript-sdk)
+- **MCP Server** - [`npm i @flexprice/mcp-server`](https://github.com/flexprice/mcp-server)
+
+<Note>
+SDKs are automatically generated from the OpenAPI specification and include type safety, automatic retries, and idiomatic patterns for each language.
+</Note>
+
+## OpenAPI Specification
+
+The complete API specification is available in OpenAPI 3.0 format:
+
+```bash View OpenAPI Spec
+curl http://localhost:8080/swagger/doc.json
+```
+
+You can import this specification into tools like Postman, Insomnia, or use it to generate custom client libraries.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate API requests
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/api/errors">
+    Understand error codes and formats
+  </Card>
+  <Card title="Pagination" icon="list" href="/api/pagination">
+    Work with paginated list responses
+  </Card>
+  <Card title="Swagger UI" icon="book" href="http://localhost:8080/swagger/index.html">
+    Explore the interactive API documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,141 @@
+---
+title: "Update Plan"
+api: "PUT /v1/plans/{id}"
+description: "Update plan details. Use when changing plan name, description, or metadata. Partial update supported."
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique identifier of the plan to update.
+  
+  **Example:** `"plan_a1b2c3d4e5f6g7h8i9j0"`
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string">
+  Updated human-readable name for the plan.
+  
+  **Example:** `"Pro Plan - Updated"`
+</ParamField>
+
+<ParamField body="lookup_key" type="string">
+  Updated unique lookup key.
+  
+  **Example:** `"pro-monthly-v2"`
+</ParamField>
+
+<ParamField body="description" type="string">
+  Updated description of the plan.
+  
+  **Example:** `"Professional tier with enhanced features"`
+</ParamField>
+
+<ParamField body="display_order" type="integer">
+  Updated display order.
+  
+  **Example:** `3`
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Updated metadata. This replaces all existing metadata.
+  
+  **Example:** `{"tier": "professional", "updated": "true"}`
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the plan.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Updated human-readable name for the plan.
+</ResponseField>
+
+<ResponseField name="lookup_key" type="string">
+  Updated unique lookup key.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Updated description of the plan.
+</ResponseField>
+
+<ResponseField name="display_order" type="integer">
+  Updated display order for the plan.
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Updated custom metadata.
+</ResponseField>
+
+<ResponseField name="environment_id" type="string">
+  Environment ID where the plan exists.
+</ResponseField>
+
+<ResponseField name="tenant_id" type="string">
+  Tenant ID that owns this plan.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Status of the plan.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the plan was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp when the plan was last updated.
+</ResponseField>
+
+<ResponseField name="created_by" type="string">
+  ID of the user who created the plan.
+</ResponseField>
+
+<ResponseField name="updated_by" type="string">
+  ID of the user who last updated the plan.
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl --request PUT \
+  --url https://api.flexprice.io/v1/plans/plan_a1b2c3d4e5f6g7h8i9j0 \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "Pro Plan - Enhanced",
+    "description": "Professional tier with enhanced features and priority support",
+    "metadata": {
+      "tier": "professional",
+      "updated": "true",
+      "version": "2.0"
+    }
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "plan_a1b2c3d4e5f6g7h8i9j0",
+  "name": "Pro Plan - Enhanced",
+  "lookup_key": "pro-monthly",
+  "description": "Professional tier with enhanced features and priority support",
+  "display_order": 2,
+  "metadata": {
+    "tier": "professional",
+    "updated": "true",
+    "version": "2.0"
+  },
+  "environment_id": "env_123",
+  "tenant_id": "tenant_123",
+  "status": "published",
+  "created_at": "2024-03-20T15:04:05Z",
+  "updated_at": "2024-03-20T16:45:22Z",
+  "created_by": "user_456",
+  "updated_by": "user_789"
+}
+```
