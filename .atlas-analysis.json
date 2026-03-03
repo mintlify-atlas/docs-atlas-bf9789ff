@@ -1,0 +1,228 @@
+{
+  "projectType": "saas",
+  "projectName": "FlexPrice",
+  "projectDescription": "Usage-based pricing and billing platform for AI-native companies and SaaS teams with real-time metering, credit management, and flexible pricing models.",
+  "theme": "sequoia",
+  "primaryColor": "#0066CC",
+  "lightColor": "#3399FF",
+  "darkColor": "#004499",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/tenancy",
+              "concepts/customers",
+              "concepts/metering",
+              "concepts/pricing",
+              "concepts/credits",
+              "concepts/invoicing"
+            ]
+          },
+          {
+            "group": "Usage Metering",
+            "pages": [
+              "metering/overview",
+              "metering/events",
+              "metering/meters",
+              "metering/aggregations"
+            ]
+          },
+          {
+            "group": "Pricing & Plans",
+            "pages": [
+              "pricing/plans",
+              "pricing/prices",
+              "pricing/features",
+              "pricing/addons",
+              "pricing/tiers"
+            ]
+          },
+          {
+            "group": "Credits & Wallets",
+            "pages": [
+              "credits/wallets",
+              "credits/grants",
+              "credits/top-ups",
+              "credits/expiration"
+            ]
+          },
+          {
+            "group": "Billing & Invoicing",
+            "pages": [
+              "billing/subscriptions",
+              "billing/invoices",
+              "billing/payments",
+              "billing/credit-notes",
+              "billing/coupons"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/stripe",
+              "integrations/webhooks"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/installation",
+              "self-hosting/configuration",
+              "self-hosting/deployment",
+              "self-hosting/scaling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/errors",
+              "api/pagination"
+            ]
+          },
+          {
+            "group": "Customers",
+            "pages": [
+              "api/customers/create",
+              "api/customers/list",
+              "api/customers/get",
+              "api/customers/update",
+              "api/customers/delete"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events/ingest",
+              "api/events/batch",
+              "api/events/query"
+            ]
+          },
+          {
+            "group": "Meters",
+            "pages": [
+              "api/meters/create",
+              "api/meters/list",
+              "api/meters/get",
+              "api/meters/update"
+            ]
+          },
+          {
+            "group": "Plans",
+            "pages": [
+              "api/plans/create",
+              "api/plans/list",
+              "api/plans/get",
+              "api/plans/update"
+            ]
+          },
+          {
+            "group": "Subscriptions",
+            "pages": [
+              "api/subscriptions/create",
+              "api/subscriptions/list",
+              "api/subscriptions/get",
+              "api/subscriptions/update",
+              "api/subscriptions/cancel"
+            ]
+          },
+          {
+            "group": "Invoices",
+            "pages": [
+              "api/invoices/list",
+              "api/invoices/get",
+              "api/invoices/finalize"
+            ]
+          },
+          {
+            "group": "Wallets & Credits",
+            "pages": [
+              "api/wallets/create",
+              "api/wallets/get",
+              "api/credits/grant",
+              "api/credits/list"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "api/features/create",
+              "api/features/list",
+              "api/features/check-access"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs",
+        "groups": [
+          {
+            "group": "Client Libraries",
+            "pages": [
+              "sdks/overview",
+              "sdks/go",
+              "sdks/python",
+              "sdks/typescript",
+              "sdks/mcp"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time usage metering with high-volume event ingestion",
+    "Flexible pricing models (usage-based, seat-based, hybrid)",
+    "Prepaid and promotional credit management with wallets",
+    "Feature gating and entitlement management",
+    "Automated invoice generation and billing cycles",
+    "Integration with payment providers (Stripe, Chargebee, Razorpay)",
+    "Multi-tenant architecture with environment isolation",
+    "Self-hostable open-source platform (AGPLv3)",
+    "Workflow orchestration via Temporal",
+    "Real-time analytics with ClickHouse"
+  ],
+  "publicApiSurface": [
+    "POST /v1/events - Ingest usage events",
+    "POST /v1/events/batch - Batch event ingestion",
+    "GET /v1/events - Query events",
+    "POST /v1/customers - Create customer",
+    "GET /v1/customers - List customers",
+    "GET /v1/customers/{id} - Get customer",
+    "POST /v1/meters - Create meter",
+    "GET /v1/meters - List meters",
+    "POST /v1/plans - Create pricing plan",
+    "GET /v1/plans - List plans",
+    "POST /v1/subscriptions - Create subscription",
+    "GET /v1/subscriptions - List subscriptions",
+    "PUT /v1/subscriptions/{id}/cancel - Cancel subscription",
+    "GET /v1/invoices - List invoices",
+    "GET /v1/invoices/{id} - Get invoice",
+    "POST /v1/wallets - Create wallet",
+    "POST /v1/credit-grants - Grant credits",
+    "POST /v1/features - Create feature",
+    "GET /v1/features/check-access - Check feature access",
+    "POST /v1/prices - Create price",
+    "POST /v1/coupons - Create coupon",
+    "GET /v1/health - Health check"
+  ]
+}
